@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 import sys
 import yaml
@@ -7,15 +6,15 @@ import yaml
 class ConfigParser:
     def __init__(self, config_path: str):
         self.config_dict = self.get_config(config_path)
-        
+
     def get_parser(self):
         # ADD NEW CONFIG PARAMETERS HERE
         data_configs = self.config_dict.get("data_configs")
         if data_configs is None:
-            raise Exception(f"data_configs is not available!")
+            raise Exception("data_configs is not available!")
         self.train_path = data_configs.get("train_path")
         return self
-    
+
     def __verify__argparse(self, config_path):
 
         if config_path is None:
@@ -29,7 +28,7 @@ class ConfigParser:
             config_path = Path(sys.argv[1])
             return config_path
         print(f"{config_path } is being used!")
-        
+
     def get_config(self, config_path: str):
         config_path = self.__verify__argparse(config_path)
         # reading from config file
