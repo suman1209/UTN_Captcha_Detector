@@ -1,0 +1,13 @@
+data_configs:
+    train_path: "datasets/utn_dataset_curated/part2/train"
+    val_path: "datasets/utn_dataset_curated/part2/val"
+    test_path: "datasets/utn_dataset_curated/part2/test"
+model_configs:
+    epochs: 1
+    batch_size: 32
+    device: "cuda" # either "cpu" or "cuda"
+task_configs:
+    log_expt: False # whether to log the experiment online or not
+    num_classes: 37 # A-Z, 0-9, background
+    min_cls_score: 0.01 # if the cls score for a bounding box is less than this, it is considered as background
+    nms_iou_score: 0.1 # if the iou between two bounding boxes is less than this, it is suppressed
