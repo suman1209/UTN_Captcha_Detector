@@ -3,32 +3,51 @@ import torchvision.transforms as transforms
 from PIL import Image
 import os
 
-def preprocess_image(image_path):
+def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
     """
     Preprocess a CAPTCHA image following these steps:
-    1. Convert to float
-    2. Convert to grayscale
-    3. Normalize to range [-1, 1]
-    4. Resize (Downsample)
+    1. Convert to tensor (float values)
+    2. Convert to grayscale (single channel)
+    3. Normalize using provided mean and std deviation (range [-1, 1])
+    4. Resize using downscale factor or fixed dimensions (32x100)
     """
 
     # Load the image
     image = Image.open(image_path)
 
+    # Create resize transform based on downscale factor
+    if downscale_factor:
+        resize_transform = transforms.Resize(
+            (int(image.height / downscale_factor), int(image.width / downscale_factor))
+        )
+    else:
+        resize_transform = transforms.Resize((32, 100))
+
     # Define transformation pipeline
     transform = transforms.Compose([
         transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
         transforms.Grayscale(num_output_channels=1),  # Convert to grayscale
-        transforms.Normalize(mean=[0.5], std=[0.5]),  # Normalize to range [-1, 1]
-        transforms.Resize((32, 100))  # Resize image to fixed dimensions
+        transforms.Normalize(mean=[mean], std=[std]),  # Normalize to range [-1, 1]
+        resize_transform  # Apply resizing
     ])
+    return transform(image)
 
-    # Apply transformations
-    processed_image = transform(image)
+def preprocess_bounding_boxes(bbox, downscale_factor=None):
+    """
+    Adjust bounding box coordinates if a downscale factor is provided.
+    Bounding box format: [x_center, y_center, width, height]
+    """
+    if downscale_factor:
+        x_center, y_center, width, height = bbox
+        return [
+            x_center / downscale_factor,
+            y_center / downscale_factor,
+            width / downscale_factor,
+            height / downscale_factor
+        ]
+    return bbox
 
-    return processed_image
-
-def preprocess_dataset(image_folder, output_folder):
+def preprocess_dataset(image_folder, output_folder, downscale_factor=None, mean=0.5, std=0.5):
     """
     Preprocess all images in a folder and save them as tensors.
 
@@ -36,20 +55,32 @@ def preprocess_dataset(image_folder, output_folder):
     Keep .png if you prefer preprocessing on-the-fly during training.
     """
     if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+        os.makedirs(output_folder)  # Create output directory if it doesn't exist
 
     for img_name in os.listdir(image_folder):
         if img_name.endswith('.png'):
             img_path = os.path.join(image_folder, img_name)
-            processed_image = preprocess_image(img_path)
+            processed_image = preprocess_image(img_path, downscale_factor, mean, std)
+            output_path = os.path.join(output_folder, img_name.replace('.png', '.pt'))
+            torch.save(processed_image, output_path)  # Save preprocessed image tensor
+            print(f"Saved preprocessed image to: {output_path}")
 
-            # Save preprocessed tensor
-            output_path = os.path.join(output_folder, img_name.replace('.png', '.pt'))  # Here decide file extension
-            torch.save(processed_image, output_path)
-            print(f"Saved: {output_path}")
+def deprocess_image(tensor, mean=0.5, std=0.5):
+    """
+    Convert a normalized tensor back to an image for visualization or saving.
+    """
+    inv_transform = transforms.Compose([
+        transforms.Normalize(mean=[-mean / std], std=[1 / std]),  # Reverse normalization
+        transforms.ToPILImage()  # Convert tensor to PIL Image
+    ])
+    return inv_transform(tensor)
 
 if __name__ == "__main__":
-    dataset_path = r"C:/Users/irene/Documents/UTN/CV/groupAssignment/code/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/test/images"
-    output_path = r"C:/Users/irene/Documents/UTN/CV/groupAssignment/code/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/test/preprocessed"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    base_path = os.path.join(script_dir, '..', '..', 'datasets', 'utn_dataset_curated', 'part2', 'test')
+    dataset_path = os.path.join(base_path, 'images')
+    output_path = os.path.join(base_path, 'preprocessed')
 
-    preprocess_dataset(dataset_path, output_path)
+    # Run preprocessing with a downscale factor and normalization parameters
+    preprocess_dataset(dataset_path, output_path, downscale_factor=2, mean=0.5, std=0.5)
