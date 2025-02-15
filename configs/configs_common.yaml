@@ -12,10 +12,22 @@ model_configs:
     epochs: 1
     batch_size: 32
     device: "cuda" # either "cpu" or "cuda"
+    backbone:
+        name: VGG16
+        num_stages: 6
     loss_function_related:
         alpha: 1 # loss = alpha*loc_loss + cls_loss
         pos_box_threshold: 0.5 # a default box is marked positive if it has (> pos_box_threshold) IoU score with any of the groundtruth boxes
         hard_neg_pos: 3 # num of negative boxes = hard_neg_pos * num_positive_boxes
+    optim:
+        name: SGD
+        lr: 0.001
+        momentum: 0.9
+        weight_decay: 0.0005
+    scheduler:
+        name: MultiStepLR
+        milestones: [155, 195]
+        gamma: 0.1
 
 task_configs:
     log_expt: False # whether to log the experiment online or not
