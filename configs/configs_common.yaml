@@ -5,6 +5,7 @@ data_configs:
     preprocessing_related: 
         mean: 0.5 # for raw_image normalisation
         std: 0.5 # for raw_image normalisation
+        downscale_factor: 2
     augmentation_related:
         place_holder: None # this is just a place holder, will be filled later
 

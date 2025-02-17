@@ -2,6 +2,10 @@ import torch
 import torchvision.transforms as transforms
 from PIL import Image
 import os
+import yaml
+
+with open(os.path.join(os.path.dirname(__file__), '..', '..', 'configs', 'configs_common.yaml'), 'r') as file:
+    config = yaml.safe_load(file)
 
 def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
     """
@@ -78,9 +82,17 @@ def deprocess_image(tensor, mean=0.5, std=0.5):
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    base_path = os.path.join(script_dir, '..', '..', 'datasets', 'utn_dataset_curated', 'part2', 'test')
-    dataset_path = os.path.join(base_path, 'images')
-    output_path = os.path.join(base_path, 'preprocessed')
+    test_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'images')
+    output_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'preprocessed')
+
+    preprocess_dataset(
+        test_path,
+        output_path,
+        downscale_factor=config['data_configs']['preprocessing_related'].get('downscale_factor', None),
+        mean=config['data_configs']['preprocessing_related']['mean'],
+        std=config['data_configs']['preprocessing_related']['std']
+    )
+    print("Preprocessing complete with hyperparameters from configs_common.yaml.")
 
     # Run preprocessing with a downscale factor and normalization parameters
-    preprocess_dataset(dataset_path, output_path, downscale_factor=2, mean=0.5, std=0.5)
+    # preprocess_dataset(dataset_path, output_path, downscale_factor=2, mean=0.5, std=0.5)
