@@ -2,10 +2,10 @@ data_configs:
     train_path: "datasets/utn_dataset_curated/part2/train"
     val_path: "datasets/utn_dataset_curated/part2/val"
     test_path: "datasets/utn_dataset_curated/part2/test"
-    preprocessing_related: 
+    preprocessing: 
         mean: 0.5 # for raw_image normalisation
         std: 0.5 # for raw_image normalisation
-        downscale_factor: 2
+        downscale_factor: 4
     augmentation_related:
         place_holder: None # this is just a place holder, will be filled later
 
@@ -16,7 +16,7 @@ model_configs:
     backbone:
         name: VGG16
         num_stages: 6
-    loss_function_related:
+    loss:
         alpha: 1 # loss = alpha*loc_loss + cls_loss
         pos_box_threshold: 0.5 # a default box is marked positive if it has (> pos_box_threshold) IoU score with any of the groundtruth boxes
         hard_neg_pos: 3 # num of negative boxes = hard_neg_pos * num_positive_boxes
@@ -31,6 +31,9 @@ model_configs:
         gamma: 0.1
 
 task_configs:
+    img_height: 160 # original image height
+    img_width: 640 # original image width
+    debug: False # if True will display a lot of intermediate information for debugging purposes
     log_expt: False # whether to log the experiment online or not
     num_classes: 37 # A-Z(26), 0-9(10), background(1)
     min_cls_score: 0.01 # if the cls score for a bounding box is less than this, it is considered as background

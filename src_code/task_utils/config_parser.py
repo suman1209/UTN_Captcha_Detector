@@ -4,34 +4,56 @@ import yaml
 
 
 class ConfigParser:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str | dict):
         self.config_dict = self.get_config(config_path)
 
     def get_parser(self):
         # ADD NEW CONFIG PARAMETERS HERE
+        # data configs
         data_configs = self.config_dict.get("data_configs")
         if data_configs is None:
             raise Exception("data_configs is not available!")
         self.train_path = data_configs.get("train_path")
+        prep_config = data_configs.get("preprocessing")
+        self.downscale_factor = prep_config.get("downscale_factor")
+        # model configs
+        model_configs = self.config_dict.get("model_configs")
+        loss_configs = model_configs.get("loss")
+        self.pos_box_threshold = loss_configs.get("pos_box_threshold")
+        self.neg_pos_hard_mining = loss_configs.get("hard_neg_pos")
+        self.alpha = loss_configs.get("alpha")
+
+        # task_configs
+        task_configs = self.config_dict.get("task_configs")
+        self.debug = task_configs.get("debug")
+        self.img_height = task_configs.get("img_height")
+        self.img_width = task_configs.get("img_width")
         return self
 
     def __verify__argparse(self, config_path):
 
-        if config_path is None:
+        if isinstance(config_path, str) or config_path is None:
             args_count = len(sys.argv)
             if (args_count) > 2:
                 print(f"One argument expected, got {args_count - 1}")
                 raise SystemExit(2)
-            elif args_count < 1:
+            elif args_count <= 1:
                 print("You must specify the config file")
                 raise SystemExit(2)
+
             config_path = Path(sys.argv[1])
+            return config_path
+        elif isinstance(config_path, dict):
             return config_path
         print(f"{config_path } is being used!")
 
-    def get_config(self, config_path: str):
-        config_path = self.__verify__argparse(config_path)
-        # reading from config file
-        with open(config_path, 'r') as file:
-            config = yaml.safe_load(file)
-        return config
+    def get_config(self, config: str | dict):
+        config = self.__verify__argparse(config)
+        print(f"{config = }")
+        if isinstance(config, (str, Path)):
+            # reading from yaml config file
+            with open(config, 'r') as file:
+                config_dict = yaml.safe_load(file)
+        elif isinstance(config, dict):
+            config_dict = config
+        return config_dict
