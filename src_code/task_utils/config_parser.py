@@ -4,7 +4,7 @@ import yaml
 
 
 class ConfigParser:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str | dict):
         self.config_dict = self.get_config(config_path)
 
     def get_parser(self):
@@ -20,12 +20,14 @@ class ConfigParser:
         model_configs = self.config_dict.get("model_configs")
         loss_configs = model_configs.get("loss")
         self.pos_box_threshold = loss_configs.get("pos_box_threshold")
-        self.hard_neg_pos = loss_configs.get("hard_neg_pos")
+        self.neg_pos_hard_mining = loss_configs.get("hard_neg_pos")
         self.alpha = loss_configs.get("alpha")
 
         # task_configs
         task_configs = self.config_dict.get("task_configs")
         self.debug = task_configs.get("debug")
+        self.img_height = task_configs.get("img_height")
+        self.img_width = task_configs.get("img_width")
         return self
 
     def __verify__argparse(self, config_path):

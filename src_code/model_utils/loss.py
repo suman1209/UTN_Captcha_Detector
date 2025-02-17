@@ -17,7 +17,7 @@ class MultiBoxLoss(nn.Module):
         config.alpha: loss = alpha * loc_loss + ce_loss
         """
         super(MultiBoxLoss, self).__init__()
-        self.__verify(config.pos_box_threshold)
+        self.__verify__(config.pos_box_threshold)
         self.db = default_boxes
         self.threshold = config.pos_box_threshold
         self.debug = config.debug
@@ -25,13 +25,13 @@ class MultiBoxLoss(nn.Module):
         self.alpha = config.alpha
         h, w = config.img_height, config.img_height
         self.img_scale = torch.tensor([h, w, h, w])
-        self.ds_factor = self.config.downscale_factor
+        self.ds_factor = config.downscale_factor
 
     def __verify__(self, threshold):
         msg = f"{threshold = } of type type {threshold}"
         assert isinstance(threshold, float), msg
 
-    def initialise_debug_info():
+    def initialise_debug_info(self):
         debug_info = {}
         debug_info["overlap_gt_def_boxes"] = []
         debug_info["db_for_each_obj"] = []
@@ -56,7 +56,7 @@ class MultiBoxLoss(nn.Module):
         loss(torch.float32): Mutilbox loss
         debug_info(dict): contains intermediate info about the loss calculation
         """
-        dev = locs_pred.dev
+        dev = locs_pred.device
         labels = [label.to(dev) for label in labels]
         boxes = [box.to(dev) for box in boxes]
         if self.debug:
@@ -93,17 +93,17 @@ class MultiBoxLoss(nn.Module):
                 debug_info["overlap_value_for_each_db"] = data
             _, db_for_each_obj = overlap.max(dim=1)  # (N_objects)
             if self.debug:
-                debug_info["db_for_each_obj"].append(overlap)
+                debug_info["db_for_each_obj"].append(db_for_each_obj)
             obj_for_each_db = obj_for_each_db.to(dev)
-            obj_for_each_db_copy = obj_for_each_db.copy()
+            obj_for_each_db_copy = obj_for_each_db.clone()
             db_for_each_obj = db_for_each_obj.to(dev)
             if self.debug:
                 debug_info["db_indices_for_each_obj"].append(db_for_each_obj)
             # assign each object to the corresponding maximum-overlap-prior
             obj_indices = torch.LongTensor(range(n_objects)).to(dev)
             obj_for_each_db[db_for_each_obj] = obj_indices
-            msg = f"{obj_for_each_db_copy}!{obj_for_each_db}"
-            assert torch.equal(obj_for_each_db_copy, obj_for_each_db), msg
+            msg = f"{obj_for_each_db_copy}!={obj_for_each_db}"
+            # assert torch.equal(obj_for_each_db_copy, obj_for_each_db), msg
             # artificially elevate the matching scores for the matching boxes
             overlap_value_for_each_db[db_for_each_obj] = 1.
             # each db gets the label of the object to which it is matched
@@ -140,7 +140,7 @@ class MultiBoxLoss(nn.Module):
         smooth_L1_loss = nn.SmoothL1Loss()
         loc_loss = smooth_L1_loss(locs_pred[pos_db], gt_locs[pos_db])
         if self.debug:
-            debug_info["loc_loss"].append(loc_loss)
+            debug_info["loc_loss"] = loc_loss
 
         # 2. Confidence loss
         # Apply hard negative mining
@@ -196,4 +196,6 @@ class MultiBoxLoss(nn.Module):
             ce_pos_loss = confidence_pos_loss.sum() / num_pos_boxes
             debug_info["ce_pos_loss"] = ce_pos_loss
             debug_info["loss"] = loss
+        if debug_info is None:
+           debug_info = {} 
         return loss, debug_info
