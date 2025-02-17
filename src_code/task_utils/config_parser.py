@@ -32,14 +32,15 @@ class ConfigParser:
 
     def __verify__argparse(self, config_path):
 
-        if isinstance(config_path, str):
+        if isinstance(config_path, str) or config_path is None:
             args_count = len(sys.argv)
             if (args_count) > 2:
                 print(f"One argument expected, got {args_count - 1}")
                 raise SystemExit(2)
-            elif args_count < 1:
+            elif args_count <= 1:
                 print("You must specify the config file")
                 raise SystemExit(2)
+
             config_path = Path(sys.argv[1])
             return config_path
         elif isinstance(config_path, dict):
@@ -47,11 +48,12 @@ class ConfigParser:
         print(f"{config_path } is being used!")
 
     def get_config(self, config: str | dict):
-        if isinstance(config, str):
+        config = self.__verify__argparse(config)
+        print(f"{config = }")
+        if isinstance(config, (str, Path)):
             # reading from yaml config file
-            config = self.__verify__argparse(config)
             with open(config, 'r') as file:
-                config = yaml.safe_load(file)
+                config_dict = yaml.safe_load(file)
         elif isinstance(config, dict):
             config_dict = config
         return config_dict
