@@ -29,10 +29,10 @@ def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
 
     # Define transformation pipeline
     transform = transforms.Compose([
+        resize_transform,  # Apply resizing
         transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
         transforms.Grayscale(num_output_channels=1),  # Convert to grayscale
-        transforms.Normalize(mean=[mean], std=[std]),  # Normalize to range [-1, 1]
-        resize_transform  # Apply resizing
+        transforms.Normalize(mean=[mean], std=[std])  # Normalize to range [-1, 1]
     ])
     return transform(image)
 
