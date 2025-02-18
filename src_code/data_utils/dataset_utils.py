@@ -1,8 +1,8 @@
 import torch
 import os
 from torchvision.datasets import VisionDataset
-from preprocessing import preprocess_bounding_boxes
-from augmentation import Augmentations
+from .preprocessing import preprocess_bounding_boxes
+from .augmentation import Augmentations
 
 category_id_labels = {
     0: "0",
