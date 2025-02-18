@@ -4,7 +4,7 @@ from torchvision.transforms import v2
 
 
 class Augmentations:
-    def __init__(self, flip_prob=0.3, scale_range=(0.8, 1.2)):
+    def __init__(self, flip_prob=0, scale_range=(0.8, 1.2)):
         """
         Augmentation class for Captcha dataset, including bounding boxes.
 
@@ -38,9 +38,7 @@ class Augmentations:
 
         """
 
-        image_width = image.shape[-1]
-
-        img_center = torch.tensor([image_width / 2, 0, image_width / 2, 0], dtype=torch.float32)
+        img_center = torch.tensor([1 / 2, 0, 1 / 2, 0], dtype=torch.float32)
 
         image = self.flip(image)
 
