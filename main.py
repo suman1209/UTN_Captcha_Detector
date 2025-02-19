@@ -3,12 +3,13 @@ from src_code.task_utils.config_parser import ConfigParser
 import wandb
 from src_code.data_utils.dataset_utils import get_dataloader
 from src_code.data_utils.dataset_utils import CaptchaDataset
-
+from src_code.model_utils.train_utils import trainer
 
 
 def main(config_path: str | Path | None = None) -> None:
     # all the parameters can be obtained from this configs object
     configs: ConfigParser = ConfigParser(config_path).get_parser()
+    logger = None
     if configs.debug:
         # wandb initialisation
         wandb.init(
@@ -17,24 +18,26 @@ def main(config_path: str | Path | None = None) -> None:
 
         # track hyperparameters and run metadata
         config=configs)
+        logger = wandb
 
     print(f"{configs.train_path = }")
 
     print("### Creating Dataloaders ###")
 
     train_dataset = CaptchaDataset(configs)
-    train_dataloader = get_dataloader(train_dataset, configs)
+    train_loader = get_dataloader(train_dataset, configs)
+    # @todo add the val loader and the test loader
 
     # Print batch info
-    print(f"Dataloader has {len(train_dataloader.dataset)} images")
+    print(f"Dataloader has {len(train_loader.dataset)} images")
 
 
     print("### Training Model ###")
-    # @todo, the following will go into the training script as a parameter
-    if configs.debug:
-        loss = -1
-        wandb.log({"loss": loss})
+    trainer(configs,  train_loader, val_loader=None, test_loader=None, logger=logger)
+    
     print("### Evaluating Model ###")
+    
+    # @todo dhimitri add your evaluation files here
     
     if configs.debug:
         # close wandb

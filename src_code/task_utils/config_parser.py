@@ -31,16 +31,25 @@ class ConfigParser:
 
         # model configs
         model_configs = self.config_dict.get("model_configs")
+        self.device = model_configs.get('device')
+        self.print_freq = model_configs.get('print_freq')
         self.batch_size = model_configs.get("batch_size")
+        self.epochs = model_configs.get("epochs")
 
         loss_configs = model_configs.get("loss")
         self.pos_box_threshold = loss_configs.get("pos_box_threshold")
         self.neg_pos_hard_mining = loss_configs.get("hard_neg_pos")
         self.alpha = loss_configs.get("alpha")
 
+        optim_configs = model_configs.get("optim")
+        self.lr = optim_configs.get("lr")
+        self.momentum = optim_configs.get("momentum")
+        self.weight_decay = optim_configs.get("weight_decay")
+        
         # task_configs
         task_configs = self.config_dict.get("task_configs")
         self.debug = task_configs.get("debug")
+        self.num_classes = task_configs.get("num_classes")
         self.img_height = task_configs.get("img_height")
         self.img_width = task_configs.get("img_width")
         return self
