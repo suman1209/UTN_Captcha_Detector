@@ -1,7 +1,6 @@
 import torch
 import os
 from torchvision.datasets import VisionDataset
-from .preprocessing import preprocess_bounding_boxes
 from .augmentation import Augmentations
 
 category_id_labels = {
@@ -113,8 +112,8 @@ class CaptchaDataset(VisionDataset):
 
         # Load bounding boxes and labels
         orig_bboxes, labels = self.load_labels(img_name)
-        bboxes = [preprocess_bounding_boxes(bbox, self.downscale_factor) for bbox in orig_bboxes]
-        bboxes = torch.tensor(bboxes, dtype=torch.float32)
+
+        bboxes = torch.tensor(orig_bboxes, dtype=torch.float32)
 
         labels = torch.tensor(labels, dtype=torch.int64)
 

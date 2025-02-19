@@ -4,7 +4,7 @@ from torchvision.transforms import v2
 
 
 class Augmentations:
-    def __init__(self, flip_prob=0, scale_range=(0.8, 1.2)):
+    def __init__(self, flip_prob=1, scale_range=(0.8, 1.2)):
         """
         Augmentation class for Captcha dataset, including bounding boxes.
 
