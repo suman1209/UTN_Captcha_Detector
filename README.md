@@ -13,6 +13,7 @@ Main Resource for the loss function used: https://github.com/sgrvinod/a-PyTorch-
 # CIP Pool setup
 Since the CIP pool computers are limited in memory, the project has to be setup in the /var/lit2425/<your_team>/computer_vision directory.
 In order to direct the pip package manager to install packages in a separate directory:
+
 ```
 mkdir pip_cache
 python -m venv "captcha_env"
