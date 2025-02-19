@@ -17,7 +17,7 @@ def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
     """
 
     # Load the image
-    image = Image.open(image_path)
+    image = Image.open(image_path).convert("RGB")  # Convert RGBA to RGB
 
     # Create resize transform based on downscale factor
     if downscale_factor:
@@ -82,11 +82,16 @@ def deprocess_image(tensor, mean=0.5, std=0.5):
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    test_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'images')
-    output_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'preprocessed')
+    # Test Data
+    # test_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'images')
+    # output_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'preprocessed')
+
+    # Train Datawwwwww
+    train_path = os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'images')
+    output_path = os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'preprocessed')
 
     preprocess_dataset(
-        test_path,
+        train_path,
         output_path,
         downscale_factor=config['data_configs']['preprocessing_related'].get('downscale_factor', None),
         mean=config['data_configs']['preprocessing_related']['mean'],

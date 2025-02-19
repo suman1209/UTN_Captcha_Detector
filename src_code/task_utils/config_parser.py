@@ -31,6 +31,10 @@ class ConfigParser:
 
         # model configs
         model_configs = self.config_dict.get("model_configs")
+        if model_configs is None:
+            raise KeyError("model_configs is missing from the config file!")
+        self.model_configs = model_configs  
+        self.checkpoint = model_configs.get("checkpoint", None)
         self.device = model_configs.get('device')
         self.print_freq = model_configs.get('print_freq')
         self.batch_size = model_configs.get("batch_size")

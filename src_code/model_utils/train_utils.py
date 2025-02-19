@@ -4,10 +4,10 @@ import torch.backends.cudnn as cudnn
 from torch import nn, optim
 import torch.utils.data
 from torch.utils.data import DataLoader
-from loss import MultiBoxLoss
-from ssd import SSD300
-from data_utils.dataset_utils import CaptchaDataset
-from data_utils.preprocessing import *
+from src_code.model_utils.loss import MultiBoxLoss
+from src_code.model_utils.ssd import SSD
+from src_code.data_utils.dataset_utils import CaptchaDataset
+from src_code.data_utils.preprocessing import *
 from src_code.task_utils.config_parser import ConfigParser
 
 class Metrics(object):
@@ -45,7 +45,8 @@ class CaptchaTrainer:
         self.loss_fn = loss_fn
         self.optim = optimizer
         self.config = config
-        self.logger = self.logger
+        self.logger = logger
+        self.start_epoch = 0  # Default start epoch
 
     def train_step(self, epoch):
         self.model.to(self.config.device)
@@ -103,16 +104,16 @@ class CaptchaTrainer:
                 # @todo need to add the evaluation methods here.
 
     def fit(self):
-        for epoch in range(start_epoch, configs.epochs)
+        for epoch in range(self.start_epoch, self.config.get_parser().epochs):
             self.train_step(epoch)
             self.val_step()
         
 def trainer(configs: ConfigParser,  train_loader, val_loader, test_loader, logger):
 
     # Initialize model or load checkpoint
-    if configs.checkpoint is None:
+    if not hasattr(configs, "checkpoint") or configs.checkpoint is None:
         start_epoch = 0
-        model = SSD300()
+        model = SSD()
         # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
         biases = list()
         not_biases = list()
@@ -122,14 +123,14 @@ def trainer(configs: ConfigParser,  train_loader, val_loader, test_loader, logge
                     biases.append(param)
                 else:
                     not_biases.append(param)
-        optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * lr}, {'params': not_biases}],
+        optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * configs.lr}, {'params': not_biases}],
                                     lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
     else:
         raise Exception("No support for checkpoint as of now!")
     
     loss_fn = MultiBoxLoss(default_boxes=None, config=configs)
 
-    trainer = CaptchaTrainer(model, train_loader, val_loader, test_loader, loss_fn, optimizer, config, logger)
+    trainer = CaptchaTrainer(model, train_loader, val_loader, test_loader, loss_fn, optimizer, configs, logger)
     
     # train
     trainer.fit()

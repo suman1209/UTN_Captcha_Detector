@@ -24,19 +24,25 @@ def main(config_path: str | Path | None = None) -> None:
 
     print("### Creating Dataloaders ###")
 
+    # Create datasets
     train_dataset = CaptchaDataset(configs)
+    val_dataset = CaptchaDataset(configs)
+    test_dataset = CaptchaDataset(configs)
+
+    # Create data loaders
     train_loader = get_dataloader(train_dataset, configs)
-    # @todo add the val loader and the test loader
+    val_loader = get_dataloader(val_dataset, configs)
+    test_loader = get_dataloader(test_dataset, configs)
 
     # Print batch info
-    print(f"Dataloader has {len(train_loader.dataset)} images")
-
+    print(f"Train Dataloader has {len(train_loader.dataset)} images")
+    print(f"Validation Dataloader has {len(val_loader.dataset)} images")
+    print(f"Test Dataloader has {len(test_loader.dataset)} images")
 
     print("### Training Model ###")
     trainer(configs,  train_loader, val_loader=None, test_loader=None, logger=logger)
     
     print("### Evaluating Model ###")
-    
     # @todo dhimitri add your evaluation files here
     
     if configs.debug:

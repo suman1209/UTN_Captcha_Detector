@@ -16,12 +16,11 @@ data_configs:
     scale_range: (0.8, 1.2)
 
 model_configs:
-  checkpoint: None
-  device: "cuda"
+  checkpoint: null
   print_freq: 500
   epochs: 1
   batch_size: 32
-  device: "cuda" # either "cpu" or "cuda"
+  device: "cpu" # either "cpu" or "cuda"
   backbone:
     name: VGG16
     num_stages: 6

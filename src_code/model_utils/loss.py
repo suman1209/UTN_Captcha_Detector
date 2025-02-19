@@ -16,8 +16,7 @@ class MultiBoxLoss(nn.Module):
         config.neg_pos_hard_mining(int): for hard negative mining
         config.alpha: loss = alpha * loc_loss + ce_loss
         """
-        super(MultiBoxLoss, self).__init__()
-        self.__verify__(config.pos_box_threshold)
+        super().__init__()
         self.db = default_boxes
         self.threshold = config.pos_box_threshold
         self.debug = config.debug
