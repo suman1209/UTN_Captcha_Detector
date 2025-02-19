@@ -48,23 +48,21 @@ label_map['background'] = 36
 
 
 class CaptchaDataset(VisionDataset):
-    def __init__(self, preprocessed_dir, labels_dir, downscale_factor, augment=True):
+    def __init__(self, config):
         """
         Captcha Dataset for loading preprocessed data
 
         preprocessed_dir: preprocessed tensors
         labels_dir: label files
-        downscale_factor: needed for on-the-fly bounding box preprocessing
         """
-        super().__init__(preprocessed_dir)
+        super().__init__(config.preprocessed_dir)
 
-        self.preprocessed_dir = preprocessed_dir
-        self.labels_dir = labels_dir
-        self.downscale_factor = downscale_factor
-        self.augment = augment
-        self.augmentations = Augmentations()
+        self.preprocessed_dir = config.preprocessed_dir
+        self.labels_dir = config.labels_dir
+        self.augment = config.augment
+        self.augmentations = Augmentations(config)
 
-        self.image_names = sorted([f for f in os.listdir(preprocessed_dir) if f.endswith(".pt")])
+        self.image_names = sorted([f for f in os.listdir(config.preprocessed_dir) if f.endswith(".pt")])
 
     def load_labels(self, image_name):
         """
@@ -124,13 +122,13 @@ class CaptchaDataset(VisionDataset):
         return image, bboxes, labels
 
 
-def get_dataloader(dataset, batch_size=32, shuffle=True) -> torch.utils.data.DataLoader:
+def get_dataloader(dataset, config) -> torch.utils.data.DataLoader:
     """
     Creates a DataLoader for the dataset
     """
     dataloader = torch.utils.data.DataLoader(dataset=dataset,
-                                             batch_size=batch_size,
-                                             shuffle=shuffle,
+                                             batch_size=config.batch_size,
+                                             shuffle=config.shuffle,
                                              collate_fn=collate_fn)
     return dataloader
 

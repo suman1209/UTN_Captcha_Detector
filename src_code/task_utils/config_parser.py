@@ -14,10 +14,25 @@ class ConfigParser:
         if data_configs is None:
             raise Exception("data_configs is not available!")
         self.train_path = data_configs.get("train_path")
-        prep_config = data_configs.get("preprocessing")
+        prep_config = data_configs.get("preprocessing_related")
         self.downscale_factor = prep_config.get("downscale_factor")
+
+        # dataset configs
+        dataset_config = data_configs.get("dataset_related")
+        self.preprocessed_dir = dataset_config.get("preprocessed_dir")
+        self.labels_dir = dataset_config.get("labels_dir")
+        self.augment = dataset_config.get("augment")
+        self.shuffle = dataset_config.get("shuffle")
+
+        # augmentation configs
+        aug_config = data_configs.get("augmentation_related")
+        self.flip_prob = aug_config.get("flip_prob")
+        self.scale_range = aug_config.get("scale_range")
+
         # model configs
         model_configs = self.config_dict.get("model_configs")
+        self.batch_size = model_configs.get("batch_size")
+
         loss_configs = model_configs.get("loss")
         self.pos_box_threshold = loss_configs.get("pos_box_threshold")
         self.neg_pos_hard_mining = loss_configs.get("hard_neg_pos")

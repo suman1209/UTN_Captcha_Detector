@@ -1,6 +1,8 @@
 from pathlib import Path
 from src_code.task_utils.config_parser import ConfigParser
 import wandb
+from src_code.data_utils.dataset_utils import get_dataloader
+from src_code.data_utils.dataset_utils import CaptchaDataset
 
 
 
@@ -17,8 +19,16 @@ def main(config_path: str | Path | None = None) -> None:
         config=configs)
 
     print(f"{configs.train_path = }")
-    
+
     print("### Creating Dataloaders ###")
+
+    train_dataset = CaptchaDataset(configs)
+    train_dataloader = get_dataloader(train_dataset, configs)
+
+    # Print batch info
+    print(f"Dataloader has {len(train_dataloader.dataset)} images")
+
+
     print("### Training Model ###")
     # @todo, the following will go into the training script as a parameter
     if configs.debug:

@@ -4,14 +4,14 @@ from torchvision.transforms import v2
 
 
 class Augmentations:
-    def __init__(self, flip_prob=1, scale_range=(0.8, 1.2)):
+    def __init__(self, config):
         """
         Augmentation class for Captcha dataset, including bounding boxes.
 
         """
-        self.flip_prob = flip_prob
+        self.flip_prob = config.flip_prob
         self.flip = v2.RandomHorizontalFlip(p=1.0)
-        self.scale_range = scale_range
+        self.scale_range = config.scale_range
 
     def apply(self, image, bboxes):
         """
