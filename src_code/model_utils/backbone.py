@@ -1,30 +1,126 @@
 import torch
 import torch.nn as nn
 from torchvision import models
+import torchvision
+import torch.nn.functional as F
 
 class VGG16Backbone(nn.Module):
-    """VGG16 backbone for SSD model (modified for grayscale input)."""
-    def __init__(self, pretrained=True, in_channels=1):
-        super().__init__()
+    """
+    VGG base convolutions to produce lower-level feature maps.
+    """
 
-        vgg16 = models.vgg16(pretrained=pretrained)
-        
-        # Modify first conv layer for grayscale (1 channel)
-        self.features = vgg16.features[:30]
-        if in_channels == 1:
-            self.features[0] = nn.Conv2d(in_channels, 64, kernel_size=3, stride=1, padding=1)
-        
-        # Additional SSD layers (conv6, conv7)
-        self.conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=1)
+    def __init__(self, pretrained=False):
+        super(VGG16Backbone, self).__init__()
+        self.pretrained = pretrained
+        # Standard convolutional layers in VGG16
+        self.conv1_1 = nn.Conv2d(1, 64, kernel_size=3, padding=1)  # stride = 1, by default
+        self.conv1_2 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.conv2_1 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.conv2_2 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.conv3_1 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.conv3_2 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.conv3_3 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)  # ceiling (not floor) here for even dims
+
+        self.conv4_1 = nn.Conv2d(256, 512, kernel_size=3, padding=1)
+        self.conv4_2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.conv4_3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.conv5_1 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.conv5_2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.conv5_3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.pool5 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)  # retains size because stride is 1 (and padding)
+
+        # Replacements for FC6 and FC7 in VGG16
+        self.conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6)  # atrous convolution
+
         self.conv7 = nn.Conv2d(1024, 1024, kernel_size=1)
-        self.relu = nn.ReLU(inplace=True)
 
-    def forward(self, x):
-        # VGG16 base features
-        conv4_3 = self.features(x)
+        # Load pretrained layers
+        if self.pretrained:
+            self.load_pretrained_layers()
+
+    def forward(self, image):
+        """
+        Forward propagation.
+
+        :param image: images, a tensor of dimensions (N, 3, 300, 300)
+        :return: lower-level feature maps conv4_3 and conv7
+        """
+        out = F.relu(self.conv1_1(image))  # (N, 64, 300, 300)
+        out = F.relu(self.conv1_2(out))  # (N, 64, 300, 300)
         
-        # SSD-specific additional layers
-        conv6_out = self.relu(self.conv6(conv4_3))
-        conv7_out = self.relu(self.conv7(conv6_out))
-        
-        return [conv4_3, conv7_out]
+        out = self.pool1(out)  # (N, 64, 150, 150)
+        out = F.relu(self.conv2_1(out))  # (N, 128, 150, 150)
+        out = F.relu(self.conv2_2(out))  # (N, 128, 150, 150)
+        conv2_2_feats = out
+        out = self.pool2(out)  # (N, 128, 75, 75)
+        out = F.relu(self.conv3_1(out))  # (N, 256, 75, 75)
+        out = F.relu(self.conv3_2(out))  # (N, 256, 75, 75)
+        out = F.relu(self.conv3_3(out))  # (N, 256, 75, 75)
+        conv3_3_feats = out
+        out = self.pool3(out)  # (N, 256, 38, 38), it would have been 37 if not for ceil_mode = True
+
+        out = F.relu(self.conv4_1(out))  # (N, 512, 38, 38)
+        out = F.relu(self.conv4_2(out))  # (N, 512, 38, 38)
+        out = F.relu(self.conv4_3(out))  # (N, 512, 38, 38)
+        conv4_3_feats = out  # (N, 512, 38, 38)
+        out = self.pool4(out)  # (N, 512, 19, 19)
+
+        out = F.relu(self.conv5_1(out))  # (N, 512, 19, 19)
+        out = F.relu(self.conv5_2(out))  # (N, 512, 19, 19)
+        out = F.relu(self.conv5_3(out))  # (N, 512, 19, 19)
+        out = self.pool5(out)  # (N, 512, 19, 19), pool5 does not reduce dimensions
+
+        out = F.relu(self.conv6(out))  # (N, 1024, 19, 19)
+
+        # conv7_feats = F.relu(self.conv7(out))  # (N, 1024, 19, 19)
+
+        # Lower-level feature maps
+        # if self.pretrained:
+        return conv2_2_feats, conv3_3_feats
+
+    def load_pretrained_layers(self):
+        """
+        As in the paper, we use a VGG-16 pretrained on the ImageNet task as the base network.
+        There's one available in PyTorch, see https://pytorch.org/docs/stable/torchvision/models.html#torchvision.models.vgg16
+        We copy these parameters into our network. It's straightforward for conv1 to conv5.
+        However, the original VGG-16 does not contain the conv6 and con7 layers.
+        Therefore, we convert fc6 and fc7 into convolutional layers, and subsample by decimation. See 'decimate' in utils.py.
+        """
+        # Current state of base
+        state_dict = self.state_dict()
+        param_names = list(state_dict.keys())
+
+        # Pretrained VGG base
+        pretrained_state_dict = torchvision.models.vgg16(pretrained=True).state_dict()
+        pretrained_param_names = list(pretrained_state_dict.keys())
+
+        # Transfer conv. parameters from pretrained model to current model
+        for i, param in enumerate(param_names[:-4]):  # excluding conv6 and conv7 parameters
+            state_dict[param] = pretrained_state_dict[pretrained_param_names[i]]
+
+        # Convert fc6, fc7 to convolutional layers, and subsample (by decimation) to sizes of conv6 and conv7
+        # fc6
+        conv_fc6_weight = pretrained_state_dict['classifier.0.weight'].view(4096, 512, 7, 7)  # (4096, 512, 7, 7)
+        conv_fc6_bias = pretrained_state_dict['classifier.0.bias']  # (4096)
+        state_dict['conv6.weight'] = decimate(conv_fc6_weight, m=[4, None, 3, 3])  # (1024, 512, 3, 3)
+        state_dict['conv6.bias'] = decimate(conv_fc6_bias, m=[4])  # (1024)
+        # fc7
+        conv_fc7_weight = pretrained_state_dict['classifier.3.weight'].view(4096, 4096, 1, 1)  # (4096, 4096, 1, 1)
+        conv_fc7_bias = pretrained_state_dict['classifier.3.bias']  # (4096)
+        state_dict['conv7.weight'] = decimate(conv_fc7_weight, m=[4, 4, None, None])  # (1024, 1024, 1, 1)
+        state_dict['conv7.bias'] = decimate(conv_fc7_bias, m=[4])  # (1024)
+
+        # Note: an FC layer of size (K) operating on a flattened version (C*H*W) of a 2D image of size (C, H, W)...
+        # ...is equivalent to a convolutional layer with kernel size (H, W), input channels C, output channels K...
+        # ...operating on the 2D image of size (C, H, W) without padding
+
+        self.load_state_dict(state_dict)
+
+        print("\nLoaded base model.\n")

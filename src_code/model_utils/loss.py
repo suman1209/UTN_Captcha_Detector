@@ -195,6 +195,6 @@ class MultiBoxLoss(nn.Module):
             ce_pos_loss = confidence_pos_loss.sum() / num_pos_boxes
             debug_info["ce_pos_loss"] = ce_pos_loss
             debug_info["loss"] = loss
-        if debug_info is None:
-           debug_info = {} 
+        if not self.debug:
+            debug_info = {} 
         return loss, debug_info

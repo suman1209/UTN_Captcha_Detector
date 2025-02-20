@@ -20,8 +20,7 @@ def main(config_path: str | Path | None = None) -> None:
         config=configs)
         logger = wandb
 
-    print(f"{configs.train_path = }")
-
+    print(f"{configs.batch_size = }")
     print("### Creating Dataloaders ###")
 
     # Create datasets
@@ -33,14 +32,14 @@ def main(config_path: str | Path | None = None) -> None:
     train_loader = get_dataloader(train_dataset, configs)
     val_loader = get_dataloader(val_dataset, configs)
     test_loader = get_dataloader(test_dataset, configs)
-
+    img, bboxes, labels = next(iter(train_loader))
     # Print batch info
     print(f"Train Dataloader has {len(train_loader.dataset)} images")
     print(f"Validation Dataloader has {len(val_loader.dataset)} images")
     print(f"Test Dataloader has {len(test_loader.dataset)} images")
 
     print("### Training Model ###")
-    trainer(configs,  train_loader, val_loader=None, test_loader=None, logger=logger)
+    trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, logger=logger)
     
     print("### Evaluating Model ###")
     # @todo dhimitri add your evaluation files here
