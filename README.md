@@ -9,6 +9,9 @@ Main Resource for the loss function used: https://github.com/sgrvinod/a-PyTorch-
 1. Please check linting issues with flake8
 
     ```flake8```
+
+2. keep requirements.txt and requirements_conda.yaml simulataneously updated
+3. review each other code
     
 # CIP Pool setup
 Since the CIP pool computers are limited in memory, the project has to be setup in the /var/lit2425/<your_team>/computer_vision directory.
