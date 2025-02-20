@@ -58,6 +58,7 @@ class MultiBoxLoss(nn.Module):
         dev = locs_pred.device
         labels = [label.to(dev) for label in labels]
         boxes = [box.to(dev) for box in boxes]
+        self.img_scale = self.img_scale.to(dev)
         if self.debug:
             debug_info = self.initialise_debug_info()
             debug_info["num_images"] = len(boxes)
@@ -124,7 +125,7 @@ class MultiBoxLoss(nn.Module):
             # remember that we need to scale it back to normalised coordinates
             gt_cxcy_for_each_default_box /= self.img_scale
             # (N_def_boxes, 4)
-            gt_locs[i] = encode_bboxes(gt_cxcy_for_each_default_box, self.db)
+            gt_locs[i] = encode_bboxes(gt_cxcy_for_each_default_box.to(dev), self.db.to(dev))
             if self.debug:
                 debug_info["gt_locs"].append(gt_locs[i])
         # 1. Localization loss
@@ -195,6 +196,6 @@ class MultiBoxLoss(nn.Module):
             ce_pos_loss = confidence_pos_loss.sum() / num_pos_boxes
             debug_info["ce_pos_loss"] = ce_pos_loss
             debug_info["loss"] = loss
-        if debug_info is None:
-           debug_info = {} 
+        if not self.debug:
+            debug_info = {} 
         return loss, debug_info

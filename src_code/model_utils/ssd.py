@@ -1,45 +1,222 @@
 import torch
 import torch.nn as nn
-from src_code.model_utils.backbone import VGG16Backbone
+from .backbone import VGG16Backbone
 import yaml
 import os
+import torch.nn.functional as F
 
 # Load Configuration
 with open(os.path.join(os.path.dirname(__file__), '..', '..', 'configs', 'configs_common.yaml'), 'r') as file:
     config = yaml.safe_load(file)
 
 NUM_CLASSES = config['task_configs']['num_classes']
-NUM_DEFAULT_BOXES_PER_PIXEL = 4  # Number of anchors per grid cell
+# Number of anchors per grid cell
+NUM_DEFAULT_BOXES_PER_PIXEL = {'conv2_2': 3,
+                               'conv3_3': 3,
+                               'conv8_2': 3,
+                               'conv9_2': 3}
 
-class SSD(nn.Module):
+
+class AuxiliaryConvolutions(nn.Module):
+    """
+    Additional convolutions to produce higher-level feature maps.
+    """
+
+    def __init__(self):
+        super(AuxiliaryConvolutions, self).__init__()
+
+        # Auxiliary/additional convolutions on top of the VGG base
+        self.conv8_1 = nn.Conv2d(256, 256, kernel_size=1, padding=0)  # stride = 1, by default
+        self.conv8_2 = nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1)  # dim. reduction because stride > 1
+
+        self.conv9_1 = nn.Conv2d(512, 128, kernel_size=1, padding=0)
+        self.conv9_2 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1)  # dim. reduction because stride > 1
+
+        # self.conv10_1 = nn.Conv2d(256, 128, kernel_size=1, stride=2, padding=0)
+        # self.conv10_2 = nn.Conv2d(128, 256, kernel_size=3, padding=0)  # dim. reduction because padding = 0
+
+        # self.conv11_1 = nn.Conv2d(256, 128, kernel_size=1, padding=0)
+        # self.conv11_2 = nn.Conv2d(128, 256, kernel_size=3, padding=0)  # dim. reduction because padding = 0
+
+        # Initialize convolutions' parameters
+        self.init_conv2d()
+
+    def init_conv2d(self):
+        """
+        Initialize convolution parameters.
+        """
+        for c in self.children():
+            if isinstance(c, nn.Conv2d):
+                nn.init.xavier_uniform_(c.weight)
+                nn.init.constant_(c.bias, 0.)
+
+    def forward(self, conv3_3_feats):
+        """
+        Forward propagation.
+
+        :param conv3_3_feats: lower-level conv3_3 feature map, a tensor of dimensions (N, 1024, 19, 19)
+        :return: higher-level feature maps conv8_2, conv9_2, conv10_2, and conv11_2
+        """
+        out = F.relu(self.conv8_1(conv3_3_feats))  
+        out = F.relu(self.conv8_2(out))
+        conv8_2_feats = out 
+
+        out = F.relu(self.conv9_1(out))
+        out = F.relu(self.conv9_2(out))
+        conv9_2_feats = out
+
+        # out = F.relu(self.conv10_1(out))
+        # out = F.relu(self.conv10_2(out))
+        # conv10_2_feats = out
+
+        # out = F.relu(self.conv11_1(out))
+        # conv11_2_feats = F.relu(self.conv11_2(out))
+
+        # Higher-level feature maps
+        return conv8_2_feats, conv9_2_feats
+
+
+class PredictionHead(nn.Module):
+    """
+    Convolutions to predict class scores and bounding boxes using lower and higher-level feature maps.
+
+    The bounding boxes (locations) are predicted as encoded offsets w.r.t each of the 8732 prior (default) boxes.
+    See 'cxcy_to_gcxgcy' in utils.py for the encoding definition.
+
+    The class scores represent the scores of each object class in each of the 8732 bounding boxes located.
+    A high score for 'background' = no object.
+    """
+
+    def __init__(self, n_classes, n_boxes):
+        """
+        :param n_classes: number of different types of objects
+        """
+        super(PredictionHead, self).__init__()
+
+        self.n_classes = n_classes
+
+
+        # 4 prior-boxes implies we use 4 different aspect ratios, etc.
+
+        # Localization prediction convolutions (predict offsets w.r.t prior-boxes)
+        self.loc_conv2_2 = nn.Conv2d(128, n_boxes['conv2_2'] * 4, kernel_size=3, padding=1)
+        self.loc_conv3_3 = nn.Conv2d(256, n_boxes['conv3_3'] * 4, kernel_size=3, padding=1)
+        self.loc_conv8_2 = nn.Conv2d(512, n_boxes['conv8_2'] * 4, kernel_size=3, padding=1)
+        self.loc_conv9_2 = nn.Conv2d(256, n_boxes['conv9_2'] * 4, kernel_size=3, padding=1)
+        # self.loc_conv10_2 = nn.Conv2d(256, n_boxes['conv10_2'] * 4, kernel_size=3, padding=1)
+        # self.loc_conv11_2 = nn.Conv2d(256, n_boxes['conv11_2'] * 4, kernel_size=3, padding=1)
+
+        # Class prediction convolutions (predict classes in localization boxes)
+        self.cl_conv2_2 = nn.Conv2d(128, n_boxes['conv2_2'] * n_classes, kernel_size=3, padding=1)
+        self.cl_conv3_3 = nn.Conv2d(256, n_boxes['conv3_3'] * n_classes, kernel_size=3, padding=1)
+        self.cl_conv8_2 = nn.Conv2d(512, n_boxes['conv8_2'] * n_classes, kernel_size=3, padding=1)
+        self.cl_conv9_2 = nn.Conv2d(256, n_boxes['conv9_2'] * n_classes, kernel_size=3, padding=1)
+        # self.cl_conv10_2 = nn.Conv2d(256, n_boxes['conv10_2'] * n_classes, kernel_size=3, padding=1)
+        # self.cl_conv11_2 = nn.Conv2d(256, n_boxes['conv11_2'] * n_classes, kernel_size=3, padding=1)
+
+        # Initialize convolutions' parameters
+        self.init_conv2d()
+
+    def init_conv2d(self):
+        """
+        Initialize convolution parameters.
+        """
+        for c in self.children():
+            if isinstance(c, nn.Conv2d):
+                nn.init.xavier_uniform_(c.weight)
+                nn.init.constant_(c.bias, 0.)
+
+    def forward(self, conv2_2_feats, conv3_3_feats, conv8_2_feats, conv9_2_feats):
+        """
+        Forward propagation.
+
+        :param conv2_2_feats: conv2_2 feature map, a tensor of dimensions (N, 512, 38, 38)
+        :param conv3_3_feats: conv3_3 feature map, a tensor of dimensions (N, 1024, 19, 19)
+        :param conv8_2_feats: conv8_2 feature map, a tensor of dimensions (N, 512, 10, 10)
+        :param conv9_2_feats: conv9_2 feature map, a tensor of dimensions (N, 256, 5, 5)
+        :return: 8732 locations and class scores (i.e. w.r.t each prior box) for each image
+        """
+        batch_size = conv2_2_feats.size(0)
+
+        # Predict localization boxes' bounds (as offsets w.r.t prior-boxes)
+        l_conv2_2 = self.loc_conv2_2(conv2_2_feats)
+        l_conv2_2 = l_conv2_2.permute(0, 2, 3,
+                                      1).contiguous()  # (N, 38, 38, 16), to match prior-box order (after .view())
+        # (.contiguous() ensures it is stored in a contiguous chunk of memory, needed for .view() below)
+        l_conv2_2 = l_conv2_2.view(batch_size, -1, 4)
+
+        l_conv3_3 = self.loc_conv3_3(conv3_3_feats)
+        l_conv3_3 = l_conv3_3.permute(0, 2, 3, 1).contiguous()
+        l_conv3_3 = l_conv3_3.view(batch_size, -1, 4)
+
+        l_conv8_2 = self.loc_conv8_2(conv8_2_feats)
+        l_conv8_2 = l_conv8_2.permute(0, 2, 3, 1).contiguous()
+        l_conv8_2 = l_conv8_2.view(batch_size, -1, 4)
+
+        l_conv9_2 = self.loc_conv9_2(conv9_2_feats)
+        l_conv9_2 = l_conv9_2.permute(0, 2, 3, 1).contiguous()
+        l_conv9_2 = l_conv9_2.view(batch_size, -1, 4)
+
+        # l_conv10_2 = self.loc_conv10_2(conv10_2_feats)
+        # l_conv10_2 = l_conv10_2.permute(0, 2, 3, 1).contiguous()
+        # l_conv10_2 = l_conv10_2.view(batch_size, -1, 4)
+
+        # l_conv11_2 = self.loc_conv11_2(conv11_2_feats)
+        # l_conv11_2 = l_conv11_2.permute(0, 2, 3, 1).contiguous()
+        # l_conv11_2 = l_conv11_2.view(batch_size, -1, 4)
+
+        # Predict classes in localization boxes
+        c_conv2_2 = self.cl_conv2_2(conv2_2_feats)
+        c_conv2_2 = c_conv2_2.permute(0, 2, 3,
+                                      1).contiguous()
+        c_conv2_2 = c_conv2_2.view(batch_size, -1,
+                                   self.n_classes)
+
+        c_conv3_3 = self.cl_conv3_3(conv3_3_feats) 
+        c_conv3_3 = c_conv3_3.permute(0, 2, 3, 1).contiguous()
+        c_conv3_3 = c_conv3_3.view(batch_size, -1,
+                               self.n_classes)
+
+        c_conv8_2 = self.cl_conv8_2(conv8_2_feats) 
+        c_conv8_2 = c_conv8_2.permute(0, 2, 3, 1).contiguous()
+        c_conv8_2 = c_conv8_2.view(batch_size, -1, self.n_classes)
+
+        c_conv9_2 = self.cl_conv9_2(conv9_2_feats)
+        c_conv9_2 = c_conv9_2.permute(0, 2, 3, 1).contiguous()
+        c_conv9_2 = c_conv9_2.view(batch_size, -1, self.n_classes)
+
+        # c_conv10_2 = self.cl_conv10_2(conv10_2_feats)
+        # c_conv10_2 = c_conv10_2.permute(0, 2, 3, 1).contiguous()
+        # c_conv10_2 = c_conv10_2.view(batch_size, -1, self.n_classes)
+
+        # c_conv11_2 = self.cl_conv11_2(conv11_2_feats)
+        # c_conv11_2 = c_conv11_2.permute(0, 2, 3, 1).contiguous()
+        # c_conv11_2 = c_conv11_2.view(batch_size, -1, self.n_classes)
+        locs = torch.cat([l_conv2_2, l_conv3_3, l_conv8_2, l_conv9_2], dim=1)
+        classes_scores = torch.cat([c_conv2_2, c_conv3_3, c_conv8_2, c_conv9_2], dim=1)
+
+        return locs, classes_scores
+
+
+class SSDCaptcha(nn.Module):
     """
     SSD model with auxiliary network and default box generation.
     """
-    def __init__(self, num_classes=NUM_CLASSES, num_default_boxes=NUM_DEFAULT_BOXES_PER_PIXEL):
+    def __init__(self, num_classes=NUM_CLASSES, n_boxes_per_pixel=NUM_DEFAULT_BOXES_PER_PIXEL):
         super().__init__()
         self.num_classes = num_classes
-        self.num_default_boxes = num_default_boxes
+        self.n_boxes_per_pixel = n_boxes_per_pixel
         
         # Backbone Network (VGG16-based feature extractor)
-        self.backbone = VGG16Backbone(pretrained=True)
+        self.backbone = VGG16Backbone(pretrained=False)
         
         # Auxiliary Network (extra feature maps for detecting smaller objects)
-        self.auxiliary_convs = nn.Sequential(
-            nn.Conv2d(1024, 256, kernel_size=1),  # Reduce channels to 256
-            nn.ReLU(),
-            nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1),  # Downsample spatial dimensions
-            nn.ReLU(),
-            
-            nn.Conv2d(512, 128, kernel_size=1),  # Further channel reduction
-            nn.ReLU(),
-            nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),  # Another downsampling
-            nn.ReLU(),
-        )
+        self.auxiliary_convs = AuxiliaryConvolutions()
         
         # Prediction heads (for bounding box locations and class scores)
-        self.loc_head = nn.Conv2d(1024, num_default_boxes * 4, kernel_size=3, padding=1)  # Localization predictions
-        self.cls_head = nn.Conv2d(1024, num_default_boxes * num_classes, kernel_size=3, padding=1)  # Class predictions
-        
+        self.prediction_head = PredictionHead(NUM_CLASSES, n_boxes_per_pixel)
+        self.fm_info = {}
+
     def forward(self, x):
         """
         Forward pass of SSD model.
@@ -47,28 +224,33 @@ class SSD(nn.Module):
         :return: Tuple (predicted bounding box locations, predicted class scores)
         """
         # Extract base feature maps from VGG16 backbone
-        conv4_3, conv7 = self.backbone(x)
+        conv2_2_feats, conv3_3_feats = self.backbone(x)
+        print(f"{conv2_2_feats.shape = },  {conv3_3_feats.shape = }")
+        # assert False
+        conv8_2_feats, conv9_2_feats = self.auxiliary_convs(conv3_3_feats)
+
+        self.fm_info['conv2_2'] = list(conv2_2_feats.shape[-2:])
+        self.fm_info['conv3_3'] = list(conv3_3_feats.shape[-2:])
+        self.fm_info['conv8_2_feats'] = list(conv8_2_feats.shape[-2:])
+        self.fm_info['conv9_2_feats'] = list(conv9_2_feats.shape[-2:])
+        # self.fm_info['conv10_2_feats'] = list(conv10_2_feats.shape[-2:])
+        # self.fm_info['conv11_2_feats'] = list(conv11_2_feats.shape[-2:])
+        # generate the predicted location offsets and classes
+        pred_locs, pred_cls = self.prediction_head(conv2_2_feats, conv3_3_feats, conv8_2_feats, conv9_2_feats)
         
-        # Predict bounding box locations and class scores using the main feature maps (conv7)
-        pred_locs = self.loc_head(conv7)  # Bounding box offsets
-        pred_cls = self.cls_head(conv7)  # Class confidence scores
-        
-        # Reshape outputs to match the number of default boxes
-        pred_locs = pred_locs.permute(0, 2, 3, 1).contiguous().view(x.size(0), -1, 4)  # (batch_size, num_boxes, 4)
-        pred_cls = pred_cls.permute(0, 2, 3, 1).contiguous().view(x.size(0), -1, self.num_classes)  # (batch_size, num_boxes, num_classes)
-        
-        return pred_locs, pred_cls
+        return pred_locs, pred_cls, self.fm_info
     
     def generate_default_boxes(self, feature_map_shapes, aspect_ratios=[1.0, 2.0, 0.5]):
         """
         Generate default anchor boxes for each feature map.
         :param feature_map_shapes: List of tuples (height, width) representing each feature map's dimensions.
         :param aspect_ratios: List of aspect ratios to use for default boxes.
-        :return: Tensor of shape (num_default_boxes, 4) with box coordinates.
+        :return: Tensor of shape (n_boxes_per_pixel, 4) with box coordinates.
         """
         default_boxes = []
         
         for feature_shape in feature_map_shapes:
+            print(feature_shape)
             f_h, f_w = feature_shape  # Feature map height and width
             for i in range(f_h):
                 for j in range(f_w):
@@ -86,16 +268,15 @@ class SSD(nn.Module):
         return torch.tensor(default_boxes, dtype=torch.float32)  # Return as a PyTorch tensor
 
 # Example usage:
-'''
+
 if __name__ == "__main__":
-    model = SSD()
-    test_input = torch.randn(1, 3, 640, 160)  # Maintain rectangular aspect ratio
-    pred_locs, pred_cls, aux_features = model(test_input)
+    model = SSDCaptcha()
+    test_input = torch.randn(1, 1, 40, 160)  # Maintain rectangular aspect ratio
+    pred_locs, pred_cls, fm_info = model(test_input)
     print(f"Localization Output Shape: {pred_locs.shape}")
     print(f"Classification Output Shape: {pred_cls.shape}")
-    
+    print(f"fm_info: {fm_info = }")
     # Generating default boxes for different feature maps
-    feature_map_shapes = [(40, 10), (20, 5)]  # Example feature map sizes for rectangular input
+    feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
     default_boxes = model.generate_default_boxes(feature_map_shapes)
     print(f"Generated {default_boxes.shape[0]} default boxes.")
-'''

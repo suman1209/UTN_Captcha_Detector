@@ -5,7 +5,7 @@ from torch import nn, optim
 import torch.utils.data
 from torch.utils.data import DataLoader
 from src_code.model_utils.loss import MultiBoxLoss
-from src_code.model_utils.ssd import SSD
+from src_code.model_utils.ssd import SSDCaptcha
 from src_code.data_utils.dataset_utils import CaptchaDataset
 from src_code.data_utils.preprocessing import *
 from src_code.task_utils.config_parser import ConfigParser
@@ -61,7 +61,7 @@ class CaptchaTrainer:
             images.requires_grad=True
             self.optim.zero_grad()
             # Foward pass
-            loc_pred, cls_pred = self.model(images)
+            loc_pred, cls_pred, fm_info = self.model(images)
             # loss
             loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
 
@@ -82,13 +82,13 @@ class CaptchaTrainer:
     
             self.optim.step()
             losses.update(loss.item(), images.size(0))
-            ce_losses.update(debug_info['ce_loss'], images.size(0))
-            loc_losses.update(debug_info['loc_loss'], images.size(0))
-            ce_pos_losses.update(debug_info['ce_pos_loss'], images.size(0))
-            ce_neg_losses.update(debug_info['ce_hard_neg_loss'], images.size(0))
+            # ce_losses.update(debug_info['ce_loss'], images.size(0))
+            # loc_losses.update(debug_info['loc_loss'], images.size(0))
+            # ce_pos_losses.update(debug_info['ce_pos_loss'], images.size(0))
+            # ce_neg_losses.update(debug_info['ce_hard_neg_loss'], images.size(0))
             if i % self.config.print_freq == 0:                
-                print(f"Epoch: {epoch} avg Loss per epoch: {losses.avg:.4f}, avg ce_losses & loc_loss: {ce_losses.avg:.4f} {loc_losses}")
-                print(f"{debug_info = }")
+                print(f"Epoch: {epoch} avg Loss per epoch: {losses.avg:.4f}")
+                # print(f"{debug_info = }")
             
             del loc_pred, cls_pred, images, boxes, labels, debug_info
             torch.cuda.empty_cache()
@@ -100,20 +100,19 @@ class CaptchaTrainer:
         with torch.no_grad():
             for i, (images, boxes, labels) in enumerate(self.test_loader):
                 images = images.to(self.config.device) 
-                locs_pred, cls_pred = self.model(images)
+                locs_pred, cls_pred, fm_info = self.model(images)
                 # @todo need to add the evaluation methods here.
 
     def fit(self):
         for epoch in range(self.start_epoch, self.config.get_parser().epochs):
             self.train_step(epoch)
-            self.val_step()
+            self.validation_step()
         
-def trainer(configs: ConfigParser,  train_loader, val_loader, test_loader, logger):
-
+def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger):
+    model = SSDCaptcha()
     # Initialize model or load checkpoint
     if not hasattr(configs, "checkpoint") or configs.checkpoint is None:
         start_epoch = 0
-        model = SSD()
         # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
         biases = list()
         not_biases = list()
@@ -127,8 +126,13 @@ def trainer(configs: ConfigParser,  train_loader, val_loader, test_loader, logge
                                     lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
     else:
         raise Exception("No support for checkpoint as of now!")
+    # a dummy forward method to calculate the default boxes
     
-    loss_fn = MultiBoxLoss(default_boxes=None, config=configs)
+    test_input = torch.randn(1, 1, 40, 160)  # Maintain rectangular aspect ratio
+    pred_locs, pred_cls, fm_info = model(test_input)
+    feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
+    default_boxes = model.generate_default_boxes(feature_map_shapes)
+    loss_fn = MultiBoxLoss(default_boxes=default_boxes, config=configs)
 
     trainer = CaptchaTrainer(model, train_loader, val_loader, test_loader, loss_fn, optimizer, configs, logger)
     
