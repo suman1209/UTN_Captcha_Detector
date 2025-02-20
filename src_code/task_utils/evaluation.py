@@ -1,17 +1,16 @@
 # source https://gist.github.com/tuxedocat/fb024dfa36648797084d
 
 import numpy as np
-import torch
 from src_code.data_utils.dataset_utils import get_dataloader
 from src_code.model_utils.utils import find_IoU
 
 
 def levenshtein(x, y):
-    
+
     # Levenshtein distance (edit distance) between two strings
     x = np.array(list(x))
     y = np.array(list(y))
-    
+
     # Initialize DP table
     D = np.zeros((len(x) + 1, len(y) + 1), dtype=int)
     D[0, 1:] = np.arange(1, len(y) + 1)
@@ -30,7 +29,7 @@ def levenshtein(x, y):
 
 
 def detect_objects(model, image):
-    # Placeholder function to detect objects. 
+    # Placeholder function to detect objects.
     # returns  a list of (character, bounding_box) tuples.
 
     pred_locs, pred_classes = model(image.unsqueeze(0))  # Forward pass
@@ -38,33 +37,37 @@ def detect_objects(model, image):
     return [(char, bbox) for char, bbox in zip(pred_classes, pred_locs)]
 
 
-
 def edit_score(model, dataloader):
     # Compute edit distance from model predictions and ground truths
-    # takes in the trained model and images and GT Are passed through data loader
+    # takes in the trained model and images and GT Are passed
+    # through data loader
     # returns a list of edit distances per image.
 
-
     edit_distances = []
-    
-    for image, groundtruth_text in dataloader:
+
+    for images, groundtruth_text in dataloader:
+
         batch_edit_distances = []
 
         for i in range(len(images)):
-        
+
             # should date on 1 single image
-            detected_objects = detect_objects(model, image)  # Detect characters & bounding boxes
-            
+            # Detect characters & bounding boxes
+            detected_objects = detect_objects(model, images[i])
+
             if not detected_objects:
                 predicted_text = ""  # for when No characters are detected
             else:
                 # Sorting detected characters by BB x coordinates
-                detected_objects.sort(key=lambda obj: obj[1][0])  # Sort by x_min of bbox
+                # Sort by x_min of bbox
+                detected_objects.sort(key=lambda obj: obj[1][0])
                 predicted_text = "".join(char for char, _ in detected_objects)
-            
+
             # Compute edit distance
             edit_dist = levenshtein(predicted_text, groundtruth_text)
-            edit_distances.append(edit_dist)
+            batch_edit_distances.append(edit_dist)
+
+        edit_distances.extend(batch_edit_distances)
 
     return edit_distances
 
@@ -75,19 +78,19 @@ def edit_score(model, dataloader):
 # returns precision list and recall list to be used to compute AP
 
 def compute_precision_recall(detections, ground_truths, iou_threshold=0.5):
-
-    detections = sorted(detections, key=lambda x: x[0], reverse=True)  # Sort by confidence score
+    # Sort by confidence score
+    detections = sorted(detections, key=lambda x: x[0], reverse=True)
     true_positives = np.zeros(len(detections))
     false_positives = np.zeros(len(detections))
     total_gt = len(ground_truths)
     matched_gts = set()
-    
+
     for i, (confidence, pred_box) in enumerate(detections):
         best_iou = 0
         best_gt_idx = -1
 
         for j, gt_box in enumerate(ground_truths):
-            iou = compute_iou(pred_box, gt_box)
+            iou = find_IoU(pred_box, gt_box)
             if iou > best_iou:
                 best_iou = iou
                 best_gt_idx = j
@@ -121,7 +124,6 @@ def compute_average_precision(precision, recall):
 
 
 # compute mAP
-
 def compute_map(predictions, ground_truths, num_classes):
 
     aps = []
@@ -132,14 +134,14 @@ def compute_map(predictions, ground_truths, num_classes):
 
         precision, recall = compute_precision_recall(predictions[class_id], ground_truths.get(class_id, []))
         average_precision = compute_average_precision(precision, recall)
-        aps.append(ap)
+        aps.append(average_precision)
 
     return np.mean(aps) if aps else 0
 
 
 # source https://github.com/amusi/Non-Maximum-Suppression/blob/master/nms.py
 
-# takes boxes, confidence scores and iou threshold computed above 
+# takes boxes, confidence scores and iou threshold computed above
 # to return a list of intices of the kept boxes
 
 def non_max_supression(boxes, scores, iou_threshold=0.5):
@@ -164,7 +166,7 @@ def non_max_supression(boxes, scores, iou_threshold=0.5):
             break
 
         # Compute IoU with remaining boxes
-        ious = np.array([compute_iou(boxes[current_idx], boxes[i]) for i in sorted_indices[1:]])
+        ious = np.array([find_IoU(boxes[current_idx], boxes[i]) for i in sorted_indices[1:]])
 
         # Keep only boxes those that IoU < threshold
         remaining_indices = np.where(ious < iou_threshold)[0]
@@ -174,7 +176,8 @@ def non_max_supression(boxes, scores, iou_threshold=0.5):
 
 
 # apply nms per class to detect multiple classes (letter and numbers)
-# takes predictions and iou threshold to return a dictionary for filtered boxes and scores
+# takes predictions and iou threshold
+# to return a dictionary for filtered boxes and scores
 
 def nms_per_class(predictions, iou_threshold=0.5):
 
