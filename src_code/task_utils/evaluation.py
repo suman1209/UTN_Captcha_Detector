@@ -29,17 +29,12 @@ def levenshtein(x, y):
     return D[-1, -1]
 
 
-    import torch
-import numpy as np
-from src_code.data_utils.dataset_utils import get_dataloader
-
-
 def detect_objects(model, image):
     # Placeholder function to detect objects. 
     # returns  a list of (character, bounding_box) tuples.
 
     pred_locs, pred_classes = model(image.unsqueeze(0))  # Forward pass
-    # Apply non-maximum suppression (NMS) to get final boxes
+    # Apply NMS to get final boxes
     return [(char, bbox) for char, bbox in zip(pred_classes, pred_locs)]
 
 
@@ -142,3 +137,54 @@ def compute_map(predictions, ground_truths, num_classes):
     return np.mean(aps) if aps else 0
 
 
+# source https://github.com/amusi/Non-Maximum-Suppression/blob/master/nms.py
+
+# takes boxes, confidence scores and iou threshold computed above 
+# to return a list of intices of the kept boxes
+
+def non_max_supression(boxes, scores, iou_threshold=0.5):
+
+    if len(boxes) == 0:
+        return []
+
+    # Convert to NumPy arrays
+    boxes = np.array(boxes)
+    scores = np.array(scores)
+
+    # Sort by confidence score
+    sorted_indices = np.argsort(scores)[::-1]
+    kept_boxes = []
+
+    while len(sorted_indices) > 0:
+        # Pick the onesthat have the highest confidence
+        current_idx = sorted_indices[0]
+        kept_boxes.append(current_idx)
+
+        if len(sorted_indices) == 1:
+            break
+
+        # Compute IoU with remaining boxes
+        ious = np.array([compute_iou(boxes[current_idx], boxes[i]) for i in sorted_indices[1:]])
+
+        # Keep only boxes those that IoU < threshold
+        remaining_indices = np.where(ious < iou_threshold)[0]
+        sorted_indices = sorted_indices[1:][remaining_indices]
+
+    return kept_boxes
+
+
+# apply nms per class to detect multiple classes (letter and numbers)
+# takes predictions and iou threshold to return a dictionary for filtered boxes and scores
+
+def nms_per_class(predictions, iou_threshold=0.5):
+
+    filtered_predictions = {}
+
+    for class_id, (boxes, scores) in predictions.items():
+        if len(boxes) == 0:
+            continue
+
+        keep_indices = non_max_supression(boxes, scores, iou_threshold)
+        filtered_predictions[class_id] = ([boxes[i] for i in keep_indices], [scores[i] for i in keep_indices])
+
+    return filtered_predictions
