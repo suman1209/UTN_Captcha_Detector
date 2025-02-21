@@ -9,6 +9,8 @@ sys.path.insert(0, "../../")
 from src_code.data_utils.dataset_utils import CaptchaDataset, get_dataloader
 from src_code.task_utils.config_parser import ConfigParser
 import torch.optim as optim
+import wandb
+
 
 
 class CountBackbone(nn.Module):
@@ -51,6 +53,7 @@ class Trainer:
             # forward pass
             predictions = self.model(image)
             loss = self.loss_function(predictions, targets)
+            wandb.log({'train.loss' : loss })
             # backpropagation
             self.optimizer.zero_grad()
             loss.backward()
@@ -80,6 +83,8 @@ class Trainer:
 
         average_loss = total_loss / len(self.val_loader)
         print(f"Validation Loss: {average_loss:}")
+
+
 
 
 
@@ -147,6 +152,12 @@ configs_dict = {
 preprocessed_dir = "../../../datasets/utn_dataset_curated/part2/train/preprocessed"
 labels_dir = "../datasets/utn_dataset_curated/part2/train/labels"
 config = ConfigParser(configs_dict).get_parser()
+
+wandb.init(
+    project = "computer-vision-2025-Project",
+    config = config
+)
+    
 
 train_set = CaptchaDataset(config)
 image, bboxes, labels = train_set[0]
