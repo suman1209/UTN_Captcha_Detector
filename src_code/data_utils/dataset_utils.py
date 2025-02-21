@@ -117,7 +117,11 @@ class CaptchaDataset(VisionDataset):
 
         # apply augmentations
         if self.augment:
-            image, bboxes = self.augmentations.apply(image, bboxes)
+            image, bboxes, labels = self.augmentations.apply(image, bboxes, labels)
+
+        # Zoom augmentation: if after zooming no object (and bbox) is left: skip the image
+        if bboxes.numel() == 0:
+            return self.__getitem__((idx + 1) % len(self.image_names))
 
         return image, bboxes, labels
 
