@@ -72,20 +72,30 @@ class CaptchaTrainer:
             # Extract and detach loss components
             ce_loss = debug_info.get('ce_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
             loc_loss = debug_info.get('loc_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
+            ce_pos_loss = debug_info.get('ce_pos_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
+            ce_neg_loss = debug_info.get('ce_hard_neg_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
             loss_value = loss.detach().cpu().item()
-            
+
             # Backward pass
             loss.backward()
 
             self.optim.step()
 
             # Update metrics
-            losses.update(loss.item(), images.size(0))
+            losses.update(loss_value, images.size(0))
             ce_losses.update(ce_loss, images.size(0))
             loc_losses.update(loc_loss, images.size(0))
-
+            ce_pos_losses.update(ce_pos_loss, images.size(0))
+            ce_neg_losses.update(ce_neg_loss, images.size(0))
+            
             if self.logger is not None:
-                self.logger.log({"train_loss": loss, "ce_loss": ce_loss, "loc_loss": loc_loss})
+                self.logger.log({
+                "train_loss": loss_value,
+                "ce_loss": ce_loss,
+                "loc_loss": loc_loss,
+                "ce_pos_loss": ce_pos_loss,
+                "ce_neg_loss": ce_neg_loss
+            })
                 # @todo add more things whenever needed
                 # self.logger.log({"ce_loss": debug_info['ce_loss']})
                 # self.logger.log({"loc_loss": debug_info['loc_loss']})
@@ -102,13 +112,14 @@ class CaptchaTrainer:
             # loc_losses.update(debug_info['loc_loss'], images.size(0))
             # ce_pos_losses.update(debug_info['ce_pos_loss'], images.size(0))
             # ce_neg_losses.update(debug_info['ce_hard_neg_loss'], images.size(0))
-            if i % self.config.print_freq == 0:                
-                print(f"Epoch: {epoch} | Loss: {losses.avg:.4f} | CE Loss: {ce_losses.avg:.4f} | Loc Loss: {loc_losses.avg:.4f}")
-                # print(f"{debug_info = }")
-            
+            if i % self.config.print_freq == 0:
+                print(f"Epoch: {epoch} | Loss: {losses.avg:.4f} | CE Loss: {ce_losses.avg:.4f} | "
+                    f"Loc Loss: {loc_losses.avg:.4f} | CE Pos Loss: {ce_pos_losses.avg:.4f} | "
+                    f"CE Neg Loss: {ce_neg_losses.avg:.4f}")
+                
             del loc_pred, cls_pred, images, boxes, labels, debug_info
             torch.cuda.empty_cache()
-        return losses, ce_losses, loc_losses
+        return losses, ce_losses, loc_losses, ce_pos_losses, ce_neg_losses
 
     def validation_step(self):
         self.model.eval()
@@ -120,21 +131,24 @@ class CaptchaTrainer:
                 # @todo need to add the evaluation methods here.
 
     def fit(self):
-        # Main Training loop
         scheduler = self.get_scheduler()
-        
+
         # Lists to store loss values per epoch
         total_losses = []
         ce_losses = []
         loc_losses = []
-        
+        ce_pos_losses = []
+        ce_neg_losses = []
+
         for epoch in range(self.start_epoch, self.config.epochs):
-            loss, ce_loss, loc_loss = self.train_step(epoch)
+            loss, ce_loss, loc_loss, ce_pos_loss, ce_neg_loss = self.train_step(epoch)
 
             # Store epoch-wise losses
             total_losses.append(loss.avg)
             ce_losses.append(ce_loss.avg)
             loc_losses.append(loc_loss.avg)
+            ce_pos_losses.append(ce_pos_loss.avg)
+            ce_neg_losses.append(ce_neg_loss.avg)
 
             # Run validation (if applicable)
             self.validation_step()
@@ -144,16 +158,18 @@ class CaptchaTrainer:
                 print(f"{scheduler.get_last_lr() = }")
 
         # Plot the loss curves after training
-        self.plot_loss_curves(ce_losses, loc_losses)
+        self.plot_loss_curves(ce_losses, loc_losses, ce_pos_losses, ce_neg_losses)
 
-    def plot_loss_curves(self, ce_losses, loc_losses):
+    def plot_loss_curves(self, ce_losses, loc_losses, ce_pos_losses, ce_neg_losses):
         epochs = np.arange(1, len(ce_losses) + 1)
 
         # Convert lists to NumPy arrays
         ce_losses = np.array(ce_losses)
         loc_losses = np.array(loc_losses)
+        ce_pos_losses = np.array(ce_pos_losses)
+        ce_neg_losses = np.array(ce_neg_losses)
 
-        plt.figure(figsize=(10, 5))
+        plt.figure(figsize=(10, 6))
 
         # Plot CE Loss
         plt.plot(epochs, ce_losses, label='Cross Entropy Loss', marker='o', linestyle='-')
@@ -161,9 +177,15 @@ class CaptchaTrainer:
         # Plot Localization Loss
         plt.plot(epochs, loc_losses, label='Localization Loss', marker='s', linestyle='-')
 
+        # Plot CE Positive Loss
+        plt.plot(epochs, ce_pos_losses, label='CE Positive Loss', marker='^', linestyle='--')
+
+        # Plot CE Negative Loss
+        plt.plot(epochs, ce_neg_losses, label='CE Negative Loss', marker='v', linestyle='--')
+
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
-        plt.title('Loss Breakdown: CE Loss vs Loc Loss')
+        plt.title('Loss Breakdown: CE Loss, Loc Loss, CE Pos Loss, CE Neg Loss')
         plt.legend()
         plt.grid()
         plt.show()
