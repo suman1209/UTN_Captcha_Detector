@@ -208,7 +208,8 @@ class SSDCaptcha(nn.Module):
         self.n_boxes_per_pixel = n_boxes_per_pixel
         
         # Backbone Network (VGG16-based feature extractor)
-        self.backbone = VGG16Backbone(pretrained=False)
+        # self.backbone = VGG16Backbone(pretrained=False)
+        self.backbone = self.load_backbone(checkpoint_path="./src_code/model_utils/vgg_counter_checkpoint.pth")
         
         # Auxiliary Network (extra feature maps for detecting smaller objects)
         self.auxiliary_convs = AuxiliaryConvolutions()
@@ -216,7 +217,14 @@ class SSDCaptcha(nn.Module):
         # Prediction heads (for bounding box locations and class scores)
         self.prediction_head = PredictionHead(NUM_CLASSES, n_boxes_per_pixel)
         self.fm_info = {}
-
+        
+    def load_backbone(self, checkpoint_path: str):
+        # custom pretrained model by dhimitri
+        backbone = VGG16Backbone(pretrained=False)
+        checkpoint = torch.load(checkpoint_path, map_location="cpu")
+        backbone.load_state_dict(checkpoint)
+        return backbone
+    
     def forward(self, x):
         """
         Forward pass of SSD model.

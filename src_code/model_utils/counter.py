@@ -10,6 +10,8 @@ from src_code.data_utils.dataset_utils import CaptchaDataset, get_dataloader
 from src_code.task_utils.config_parser import ConfigParser
 import torch.optim as optim
 import wandb
+import os
+from datetime import datetime
 
 
 
@@ -42,7 +44,7 @@ class Trainer:
 
         self.loss_function = nn.MSELoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr = 1e-3)
-
+        self.checkpoint_path = "./"
     def backbone_train(self):
         self.model.train()
         total_loss = 0
@@ -63,7 +65,7 @@ class Trainer:
 
         average_loss = total_loss / len(self.train_loader)
         print(f"Train Loss: {average_loss:}")
-
+        self.save_checkpoint()
 
     def backbone_validation(self):
         self.model.eval() 
@@ -84,7 +86,17 @@ class Trainer:
         average_loss = total_loss / len(self.val_loader)
         print(f"Validation Loss: {average_loss:}")
 
+    def save_checkpoint(self, filename="vgg_counter_checkpoint"):
+        """Saves model checkpoint."""
+        # Get the current date and time
+        now = datetime.now()
 
+        # Format the datetime as a string (e.g., "2023-10-05_14-30-00")
+        # You can customize the format as needed
+        datetime_str = now.strftime("%Y-%m-%d_%H-%M-%S")
+        save_path = os.path.join(self.checkpoint_path, f"{filename}_{datetime_str}.pth")
+        torch.save(self.model.vgg_backbone.state_dict(), save_path)
+        print(f"Checkpoint saved at {save_path}")
 
 
 
@@ -99,8 +111,8 @@ configs_dict = {
             "downscale_factor": 4,
         },
         "dataset_related": {
-            "preprocessed_dir": "/var/lit2425/humanize/Computer Vision 2025 Project/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/preprocessed",
-            "labels_dir": "/var/lit2425/humanize/Computer Vision 2025 Project/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/labels",
+            "preprocessed_dir": "../../datasets/utn_dataset_curated/part2/train/preprocessed",
+            "labels_dir": "../../datasets/utn_dataset_curated/part2/train/labels",
             "augment": True,
             "shuffle": False,
         },
@@ -149,12 +161,10 @@ configs_dict = {
 }
 
 # # hyperparameters
-preprocessed_dir = "../../../datasets/utn_dataset_curated/part2/train/preprocessed"
-labels_dir = "../datasets/utn_dataset_curated/part2/train/labels"
 config = ConfigParser(configs_dict).get_parser()
 
 wandb.init(
-    project = "computer-vision-2025-Project",
+    project = "computer-vision-2025-Project-backbone",
     config = config
 )
     
