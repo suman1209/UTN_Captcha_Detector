@@ -38,7 +38,9 @@ class MultiBoxLoss(nn.Module):
         debug_info["overlap_value_for_each_db"] = []
         debug_info["self.label_each_db"] = []
         debug_info["match"] = []
+        debug_info["matched_gt_boxes"] = []
         debug_info["gt_locs"] = []
+        debug_info["default_box_for_each_obj"] = []
         return debug_info
 
     def forward(self, locs_pred, cls_pred, boxes, labels, downscale_factor=4):
@@ -75,7 +77,7 @@ class MultiBoxLoss(nn.Module):
         scaled_default_boxes = self.db.to(dev) * img_scale / self.ds_factor
         default_boxes_xy = cxcy_to_torch_xy(scaled_default_boxes)
         loss = -1
-
+        debug_info["soft_maxed_pred"] = []
         """
         populate the ground-truth loc offsets and labels
         for each default boxes in eahc image of the batch
@@ -94,6 +96,7 @@ class MultiBoxLoss(nn.Module):
             _, db_for_each_obj = overlap.max(dim=1)  # (N_objects)
             if self.debug:
                 debug_info["db_for_each_obj"].append(db_for_each_obj)
+                debug_info["default_box_for_each_obj"].append(default_boxes_xy[db_for_each_obj])
             obj_for_each_db = obj_for_each_db.to(dev)
             obj_for_each_db_copy = obj_for_each_db.clone()
             db_for_each_obj = db_for_each_obj.to(dev)
@@ -128,6 +131,9 @@ class MultiBoxLoss(nn.Module):
             gt_locs[i] = encode_bboxes(gt_cxcy_for_each_default_box.to(dev), self.db.to(dev))
             if self.debug:
                 debug_info["gt_locs"].append(gt_locs[i])
+                pred_softmaxed = torch.nn.functional.softmax(cls_pred[i], dim=1)[db_for_each_obj]
+                debug_info["soft_maxed_pred"].append(pred_softmaxed)
+            
         # 1. Localization loss
         # Identify priors that are positive
         # bool Tensor mask (N_batch, N_def_boxes)
