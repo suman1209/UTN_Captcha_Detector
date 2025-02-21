@@ -83,7 +83,7 @@ class VGG16Backbone(nn.Module):
 
         # Lower-level feature maps
         # if self.pretrained:
-        return conv2_2_feats, conv3_3_feats
+        return out, conv2_2_feats, conv3_3_feats
 
     def load_pretrained_layers(self):
         """

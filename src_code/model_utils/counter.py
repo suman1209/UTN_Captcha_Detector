@@ -21,10 +21,12 @@ class CountBackbone(nn.Module):
 
     def forward(self, x):
         # skipping conv4_3_feats and ony extract conv7
-        _, conv7_feats = self.vgg_backbone(x)  
-        x = F.adaptive_avg_pool2d(conv7_feats, (1, 1))  # Global average pooling
+        out, conv2_2_feats, conv3_3_feats, = self.vgg_backbone(x)  
+        x = F.adaptive_avg_pool2d(out, (1, 1))  # Global average pooling
         x = torch.flatten(x, 1)
+        print(f"{x.shape =}")
         x = self.fc(x)  # Fully connected layer
+        x = F.relu(x)
         return x
 
 
@@ -41,8 +43,8 @@ configs_dict = {
             "downscale_factor": 4,
         },
         "dataset_related": {
-            "preprocessed_dir": "/var/lit2425/humanize/Computer Vision 2025 Project/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/preprocessed",
-            "labels_dir": "/var/lit2425/humanize/Computer Vision 2025 Project/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/labels",
+            "preprocessed_dir": "/var/lit2425/jenga/suman/pjf/computer_vision/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/preprocessed",
+            "labels_dir": "/var/lit2425/jenga/suman/pjf/computer_vision/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/labels",
             "augment": True,
             "shuffle": False,
         },
@@ -97,15 +99,14 @@ config = ConfigParser(configs_dict).get_parser()
 
 train_set = CaptchaDataset(config)
 image, bboxes, labels = train_set[0]
-# print(f"Image Shape: {image.shape}")
+
 
 train_loader = get_dataloader(train_set, config)
 images, bboxes, labels = next(iter(train_loader))
-
 print(f"Batch Image Shape: {images.shape}")  # Expected: (batch_size, 1, 40, 160)
 
 model = CountBackbone()
 
 output = model(images)
 
-print(f"Model Output Shape: {output.shape}")  
+print(f"Model Output Shape: {output}")  
