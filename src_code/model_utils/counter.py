@@ -8,6 +8,8 @@ import sys
 sys.path.insert(0, "../../")
 from src_code.data_utils.dataset_utils import CaptchaDataset, get_dataloader
 from src_code.task_utils.config_parser import ConfigParser
+import torch.optim as optim
+
 
 class CountBackbone(nn.Module):
 
@@ -24,11 +26,60 @@ class CountBackbone(nn.Module):
         out, conv2_2_feats, conv3_3_feats, = self.vgg_backbone(x)  
         x = F.adaptive_avg_pool2d(out, (1, 1))  # Global average pooling
         x = torch.flatten(x, 1)
-        print(f"{x.shape =}")
+        # print(f"{x.shape =}")
         x = self.fc(x)  # Fully connected layer
         x = F.relu(x)
         return x
 
+class Trainer:
+    def __init__(self, model, train_loader, val_loader, device="cuda" if torch.cuda.is_available() else "cpu"):
+        self.model = model.to(device)
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.device = device
+
+        self.loss_function = nn.MSELoss()
+        self.optimizer = optim.Adam(self.model.parameters(), lr = 1e-3)
+
+    def backbone_train(self):
+        self.model.train()
+        total_loss = 0
+
+        for image, bboxes, labels in self.train_loader:
+            targets = torch.tensor([len(bb) for bb in bboxes])
+            image, targets = image.to(self.device), targets.to(self.device, dtype=torch.float32).unsqueeze(1)
+            # forward pass
+            predictions = self.model(image)
+            loss = self.loss_function(predictions, targets)
+            # backpropagation
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+            total_loss += loss.item()
+
+        average_loss = total_loss / len(self.train_loader)
+        print(f"Train Loss: {average_loss:}")
+
+
+    def backbone_validation(self):
+        self.model.eval() 
+        total_loss = 0
+
+        with torch.no_grad(): 
+            for image, bboxes, labels in self.val_loader:
+                targets = torch.tensor([len(bb) for bb in bboxes])
+
+                image, targets = image.to(self.device), targets.to(self.device, dtype=torch.float32).unsqueeze(1)
+
+                # Forward pass
+                predictions = self.model(image)
+                loss = self.loss_function(predictions, targets)
+
+                total_loss += loss.item()
+
+        average_loss = total_loss / len(self.val_loader)
+        print(f"Validation Loss: {average_loss:}")
 
 
 
@@ -43,8 +94,8 @@ configs_dict = {
             "downscale_factor": 4,
         },
         "dataset_related": {
-            "preprocessed_dir": "/var/lit2425/jenga/suman/pjf/computer_vision/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/preprocessed",
-            "labels_dir": "/var/lit2425/jenga/suman/pjf/computer_vision/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/labels",
+            "preprocessed_dir": "/var/lit2425/humanize/Computer Vision 2025 Project/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/preprocessed",
+            "labels_dir": "/var/lit2425/humanize/Computer Vision 2025 Project/UTN_Captcha_Detector/datasets/utn_dataset_curated/part2/train/labels",
             "augment": True,
             "shuffle": False,
         },
@@ -100,13 +151,19 @@ config = ConfigParser(configs_dict).get_parser()
 train_set = CaptchaDataset(config)
 image, bboxes, labels = train_set[0]
 
-
 train_loader = get_dataloader(train_set, config)
+
 images, bboxes, labels = next(iter(train_loader))
-print(f"Batch Image Shape: {images.shape}")  # Expected: (batch_size, 1, 40, 160)
 
 model = CountBackbone()
 
 output = model(images)
 
-print(f"Model Output Shape: {output}")  
+images, bboxes, labels = next(iter(train_loader))
+
+for image, bboxes, labels in train_loader:
+    print(len(bboxes))
+
+trainer = Trainer(model, train_loader, train_loader)
+trainer.backbone_train()
+trainer.backbone_validation()
