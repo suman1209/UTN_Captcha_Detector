@@ -1,3 +1,6 @@
+import random
+
+from matplotlib import pyplot as plt
 from backbone import VGG16Backbone
 import torch
 import torch.nn as nn
@@ -12,93 +15,6 @@ import torch.optim as optim
 import wandb
 import os
 from datetime import datetime
-
-
-
-class CountBackbone(nn.Module):
-
-    # backbone using VGG for feature extraction and predicting char count
-
-    def __init__(self):
-        super(CountBackbone, self).__init__()
-        self.vgg_backbone = VGG16Backbone(pretrained=False)  # Load VGG16
-        self.fc = nn.Linear(1024, 1)  # Final layer for regression
-
-
-    def forward(self, x):
-        # skipping conv4_3_feats and ony extract conv7
-        out, conv2_2_feats, conv3_3_feats, = self.vgg_backbone(x)  
-        x = F.adaptive_avg_pool2d(out, (1, 1))  # Global average pooling
-        x = torch.flatten(x, 1)
-        # print(f"{x.shape =}")
-        x = self.fc(x)  # Fully connected layer
-        x = F.relu(x)
-        return x
-
-class Trainer:
-    def __init__(self, model, train_loader, val_loader, device="cuda" if torch.cuda.is_available() else "cpu"):
-        self.model = model.to(device)
-        self.train_loader = train_loader
-        self.val_loader = val_loader
-        self.device = device
-
-        self.loss_function = nn.MSELoss()
-        self.optimizer = optim.Adam(self.model.parameters(), lr = 1e-3)
-        self.checkpoint_path = "./"
-    def backbone_train(self):
-        self.model.train()
-        total_loss = 0
-
-        for image, bboxes, labels in self.train_loader:
-            targets = torch.tensor([len(bb) for bb in bboxes])
-            image, targets = image.to(self.device), targets.to(self.device, dtype=torch.float32).unsqueeze(1)
-            # forward pass
-            predictions = self.model(image)
-            loss = self.loss_function(predictions, targets)
-            wandb.log({'train.loss' : loss })
-            # backpropagation
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-
-            total_loss += loss.item()
-
-        average_loss = total_loss / len(self.train_loader)
-        print(f"Train Loss: {average_loss:}")
-        self.save_checkpoint()
-
-    def backbone_validation(self):
-        self.model.eval() 
-        total_loss = 0
-
-        with torch.no_grad(): 
-            for image, bboxes, labels in self.val_loader:
-                targets = torch.tensor([len(bb) for bb in bboxes])
-
-                image, targets = image.to(self.device), targets.to(self.device, dtype=torch.float32).unsqueeze(1)
-
-                # Forward pass
-                predictions = self.model(image)
-                loss = self.loss_function(predictions, targets)
-
-                total_loss += loss.item()
-
-        average_loss = total_loss / len(self.val_loader)
-        print(f"Validation Loss: {average_loss:}")
-
-    def save_checkpoint(self, filename="vgg_counter_checkpoint"):
-        """Saves model checkpoint."""
-        # Get the current date and time
-        now = datetime.now()
-
-        # Format the datetime as a string (e.g., "2023-10-05_14-30-00")
-        # You can customize the format as needed
-        datetime_str = now.strftime("%Y-%m-%d_%H-%M-%S")
-        save_path = os.path.join(self.checkpoint_path, f"{filename}_{datetime_str}.pth")
-        torch.save(self.model.vgg_backbone.state_dict(), save_path)
-        print(f"Checkpoint saved at {save_path}")
-
-
 
 configs_dict = {
     "data_configs": {
@@ -124,7 +40,7 @@ configs_dict = {
         },
     },
     "model_configs": {
-        "epochs": 1,
+        "epochs": 100,
         "batch_size": 32,
         "device": "cuda",  # either "cpu" or "cuda"
         "checkpoint": None,
@@ -160,6 +76,109 @@ configs_dict = {
     },
 }
 
+
+class CountBackbone(nn.Module):
+
+    # backbone using VGG for feature extraction and predicting char count
+
+    def __init__(self):
+        super(CountBackbone, self).__init__()
+        self.vgg_backbone = VGG16Backbone(pretrained=False)  # Load VGG16
+        self.fc = nn.Linear(1024, 1)  # Final layer for regression
+
+
+    def forward(self, x):
+        # skipping conv4_3_feats and ony extract conv7
+        out, conv2_2_feats, conv3_3_feats, = self.vgg_backbone(x)  
+        x = F.adaptive_avg_pool2d(out, (1, 1))  # Global average pooling
+        x = torch.flatten(x, 1)
+        # print(f"{x.shape =}")
+        x = self.fc(x)  # Fully connected layer
+        x = F.relu(x)
+        return x
+
+class Trainer:
+    def __init__(self, model, train_loader, val_loader, config, device="cuda" if torch.cuda.is_available() else "cpu"):
+        self.model = model.to(device)
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.device = device
+        self.config = config
+        self.loss_function = nn.MSELoss()
+        self.optimizer = optim.Adam(self.model.parameters(), lr = 1e-3)
+        self.checkpoint_path = "./"
+        
+    def backbone_train(self):
+        self.model.train()
+        total_loss = 0
+        for image, bboxes, labels in self.train_loader:
+            targets = torch.tensor([len(bb) for bb in bboxes])
+            image, targets = image.to(self.device), targets.to(self.device, dtype=torch.float32).unsqueeze(1)
+            # forward pass
+            predictions = self.model(image)
+            loss = self.loss_function(predictions, targets)
+            wandb.log({'train.loss' : loss })
+            # backpropagation
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+            total_loss += loss.item()
+
+        average_loss = total_loss / len(self.train_loader)
+        print(f"Train Loss: {average_loss:}")
+        
+
+    def backbone_validation(self):
+        self.model.eval() 
+        total_loss = 0
+
+        with torch.no_grad(): 
+            for image, bboxes, labels in self.val_loader:
+                targets = torch.tensor([len(bb) for bb in bboxes])
+                breakpoint()
+                image, targets = image.to(self.device), targets.to(self.device, dtype=torch.float32).unsqueeze(1)
+                random_image = random.randint(0, image.shape[0] - 1)
+                # Forward pass
+                pred = round(self.model(image)[random_image].item(), 2)
+                gt = targets[random_image]
+                img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
+                # just for one image
+                # Image with bounding boxes
+                fig, ax = plt.subplots(1, figsize=(8, 4))
+                ax.imshow(img_np, cmap="gray")
+                ax.legend()
+                ax.set_title(f"GT_COUNT: {gt}, PRED: {pred}")
+                wandb.log({"COUNT: Validation": wandb.Image(fig)})
+                plt.close(fig)
+
+        average_loss = total_loss / len(self.val_loader)
+        print(f"Validation Loss: {average_loss:}")
+
+    def train(self):
+        save_epochs = [25, 50, 75, 100]
+        for epoch in range(self.config.epochs):
+            self.backbone_train()
+            self.backbone_validation()
+            if epoch in save_epochs:
+                self.save_checkpoint()
+                
+    def save_checkpoint(self, filename="vgg_counter_checkpoint"):
+        """Saves model checkpoint."""
+        # Get the current date and time
+        now = datetime.now()
+
+        # Format the datetime as a string (e.g., "2023-10-05_14-30-00")
+        # You can customize the format as needed
+        datetime_str = now.strftime("%Y-%m-%d_%H-%M-%S")
+        save_path = os.path.join(self.checkpoint_path, f"{filename}_{datetime_str}.pth")
+        torch.save(self.model.vgg_backbone.state_dict(), save_path)
+        print(f"Checkpoint saved at {save_path}")
+
+
+
+
+
 # # hyperparameters
 config = ConfigParser(configs_dict).get_parser()
 
@@ -182,9 +201,8 @@ output = model(images)
 
 images, bboxes, labels = next(iter(train_loader))
 
-for image, bboxes, labels in train_loader:
-    print(len(bboxes))
+# for image, bboxes, labels in train_loader:
+#     print(len(bboxes))
 
-trainer = Trainer(model, train_loader, train_loader)
-trainer.backbone_train()
-trainer.backbone_validation()
+trainer = Trainer(model, train_loader, train_loader, config=config)
+trainer.train()
