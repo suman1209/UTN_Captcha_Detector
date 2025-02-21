@@ -218,7 +218,7 @@ class CaptchaTrainer:
         # Plot the loss curves after training
         # self.plot_loss_curves(ce_losses, loc_losses, ce_pos_losses, ce_neg_losses)
 
-    def plot_loss_curves(self, ce_losses, loc_losses, ce_pos_losses, ce_neg_losses):
+    def plot_loss_curves(self, ce_losses, loc_losses, ce_pos_losses, ce_neg_losses, plot_local_curve=False):
         epochs = np.arange(1, len(ce_losses) + 1)
 
         # Convert lists to NumPy arrays
@@ -226,27 +226,27 @@ class CaptchaTrainer:
         loc_losses = np.array(loc_losses)
         ce_pos_losses = np.array(ce_pos_losses)
         ce_neg_losses = np.array(ce_neg_losses)
+        if plot_local_curve:
+            plt.figure(figsize=(10, 6))
 
-        plt.figure(figsize=(10, 6))
+            # Plot CE Loss
+            plt.plot(epochs, ce_losses, label='Cross Entropy Loss', marker='o', linestyle='-')
 
-        # Plot CE Loss
-        plt.plot(epochs, ce_losses, label='Cross Entropy Loss', marker='o', linestyle='-')
+            # Plot Localization Loss
+            plt.plot(epochs, loc_losses, label='Localization Loss', marker='s', linestyle='-')
 
-        # Plot Localization Loss
-        plt.plot(epochs, loc_losses, label='Localization Loss', marker='s', linestyle='-')
+            # Plot CE Positive Loss
+            plt.plot(epochs, ce_pos_losses, label='CE Positive Loss', marker='^', linestyle='--')
 
-        # Plot CE Positive Loss
-        plt.plot(epochs, ce_pos_losses, label='CE Positive Loss', marker='^', linestyle='--')
+            # Plot CE Negative Loss
+            plt.plot(epochs, ce_neg_losses, label='CE Negative Loss', marker='v', linestyle='--')
 
-        # Plot CE Negative Loss
-        plt.plot(epochs, ce_neg_losses, label='CE Negative Loss', marker='v', linestyle='--')
-
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.title('Loss Breakdown: CE Loss, Loc Loss, CE Pos Loss, CE Neg Loss')
-        plt.legend()
-        plt.grid()
-        plt.show()
+            plt.xlabel('Epochs')
+            plt.ylabel('Loss')
+            plt.title('Loss Breakdown: CE Loss, Loc Loss, CE Pos Loss, CE Neg Loss')
+            plt.legend()
+            plt.grid()
+            plt.show()
 
     def get_scheduler(self):
         configs = self.config
