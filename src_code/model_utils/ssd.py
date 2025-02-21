@@ -263,7 +263,7 @@ class SSDCaptcha(nn.Module):
                         w = 1.0 / f_w * ratio
                         h = 1.0 / f_h / ratio
                         
-                        default_boxes.append([cx, cy, w, h])
+                        default_boxes.append([cy, cx, h, w])
         
         return torch.tensor(default_boxes, dtype=torch.float32)  # Return as a PyTorch tensor
 
