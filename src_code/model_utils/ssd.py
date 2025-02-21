@@ -225,7 +225,7 @@ class SSDCaptcha(nn.Module):
         """
         # Extract base feature maps from VGG16 backbone
         conv2_2_feats, conv3_3_feats = self.backbone(x)
-        print(f"{conv2_2_feats.shape = },  {conv3_3_feats.shape = }")
+        # print(f"{conv2_2_feats.shape = },  {conv3_3_feats.shape = }")
         # assert False
         conv8_2_feats, conv9_2_feats = self.auxiliary_convs(conv3_3_feats)
 

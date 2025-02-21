@@ -155,7 +155,7 @@ class CaptchaTrainer:
 
             if scheduler is not None:
                 scheduler.step()
-                print(f"{scheduler.get_last_lr() = }")
+                # print(f"{scheduler.get_last_lr() = }")
 
         # Plot the loss curves after training
         self.plot_loss_curves(ce_losses, loc_losses, ce_pos_losses, ce_neg_losses)
