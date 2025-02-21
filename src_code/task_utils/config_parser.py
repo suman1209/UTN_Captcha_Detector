@@ -28,6 +28,8 @@ class ConfigParser:
         aug_config = data_configs.get("augmentation_related")
         self.flip_prob = aug_config.get("flip_prob")
         self.scale_range = aug_config.get("scale_range")
+        self.zoom_prob = aug_config.get("zoom_prob")
+        self.saturation_prob = aug_config.get("saturation_prob")
 
         # model configs
         model_configs = self.config_dict.get("model_configs")
