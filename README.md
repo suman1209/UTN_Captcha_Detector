@@ -27,7 +27,7 @@ pip install -r UTN_Captcha_Detector/requirements.txt --cache-dir ./pip_cache/
 # Alex Cluster setup
 First create the conda environment if it doesn't exist
 ```
-conda env create -f environment.yml
+conda env create -f requirements_conda.yaml
 ```
 Transfer the dataset to the cluster using the following command
 ```
