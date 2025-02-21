@@ -92,37 +92,8 @@ class CaptchaTrainer:
                 gt_boxes = boxes[random_image].cpu().numpy()
 
                 matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
-
-                # Image with bounding boxes
-                fig, ax = plt.subplots(1, figsize=(8, 4))
-                ax.imshow(img_np)
-
-                img_height, img_width, _ = img_np.shape
-
-                # Get ground truth boxes and scale to image size
-                gt_boxes[:, [0, 2]] *= img_width
-                gt_boxes[:, [1, 3]] *= img_height
-
-                # Plot ground truth boxes
-                # https://stackoverflow.com/questions/37435369/how-to-draw-a-rectangle-on-image
-                for box in gt_boxes:
-                    x_min, y_min, x_max, y_max = box
-                    rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='pink', facecolor='none')
-                    ax.add_patch(rect)
-
-                # Plot matched boxes
-                for box in matched_boxes:
-                    x_min, y_min, x_max, y_max = box
-                    rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='blue', facecolor='none')
-                    ax.add_patch(rect)
-
-                ax.legend()
-                ax.set_title(f"Image in epoch: {epoch}, step {i}")
-
-                wandb.log({"bbox_visual": wandb.Image(fig)})
-                plt.close(fig)
-
-            only_once = True
+                self.plot_bb(img_np, gt_boxes, matched_boxes, epoch, i)
+                only_once = True
 
             # Extract and detach loss components
             ce_loss = debug_info.get('ce_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
@@ -245,7 +216,7 @@ class CaptchaTrainer:
                 # print(f"{scheduler.get_last_lr() = }")
 
         # Plot the loss curves after training
-        self.plot_loss_curves(ce_losses, loc_losses, ce_pos_losses, ce_neg_losses)
+        # self.plot_loss_curves(ce_losses, loc_losses, ce_pos_losses, ce_neg_losses)
 
     def plot_loss_curves(self, ce_losses, loc_losses, ce_pos_losses, ce_neg_losses):
         epochs = np.arange(1, len(ce_losses) + 1)
@@ -295,8 +266,44 @@ class CaptchaTrainer:
             print("No learning rate scheduler!")
         else:
             print(f"{scheduler} applied!")
+            
         return scheduler
+    
+    def plot_bb(self, img_np, gt_boxes, matched_boxes, epoch, i):
+        # Image with bounding boxes
+        fig, ax = plt.subplots(1, figsize=(8, 4))
+        ax.imshow(img_np, cmap="gray")
 
+        img_height, img_width, _ = img_np.shape
+
+        # Get ground truth boxes and scale to image size
+        gt_boxes[:, [0, 2]] *= img_width
+        gt_boxes[:, [1, 3]] *= img_height
+        
+        
+        # Get ground truth boxes and scale to image size
+        matched_boxes[:, [0, 2]] *= img_width
+        matched_boxes[:, [1, 3]] *= img_height
+
+
+        # Plot ground truth boxes
+        # https://stackoverflow.com/questions/37435369/how-to-draw-a-rectangle-on-image
+        for box in gt_boxes:
+            x_min, y_min, x_max, y_max = box
+            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='pink', facecolor='none')
+            ax.add_patch(rect)
+
+        # Plot matched boxes
+        for box in matched_boxes:
+            x_min, y_min, x_max, y_max = box
+            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='blue', facecolor='none')
+            ax.add_patch(rect)
+
+        ax.legend()
+        ax.set_title(f"Image in epoch: {epoch}, step {i}")
+        wandb.log({"bbox_visual": wandb.Image(fig)})
+        plt.close(fig)
+    
 def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger):
     model = SSDCaptcha()
     # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
@@ -311,12 +318,11 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
     optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * configs.lr}, {'params': not_biases}],
                                 lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
         
-    # a dummy forward method to calculate the default boxes
-    
-    test_input = torch.randn(1, 1, 40, 160)  # Maintain rectangular aspect ratio
-    pred_locs, pred_cls, fm_info = model(test_input)
-    feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
-    default_boxes = model.generate_default_boxes(feature_map_shapes)
+    # # a dummy forward method to calculate the default boxes
+    # test_input = torch.randn(1, 1, 40, 160)  # Maintain rectangular aspect ratio
+    # pred_locs, pred_cls, fm_info = model(test_input)
+    # feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
+    default_boxes = model.generate_default_boxes()
     loss_fn = MultiBoxLoss(default_boxes=default_boxes, config=configs)
 
     trainer = CaptchaTrainer(model, train_loader, val_loader, test_loader, loss_fn, optimizer, configs, logger)

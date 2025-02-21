@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-from .utils import cxcy_to_torch_xy, torch_xy_to_cxcy, encode_bboxes, find_IoU
+from .utils import cxcy_to_xy, xy_to_cxcy, encode_bboxes, find_IoU
 from src_code.data_utils.dataset_utils import label_map
 from src_code.task_utils.config_parser import ConfigParser
 
@@ -74,8 +74,8 @@ class MultiBoxLoss(nn.Module):
         # (N_batch, N_def_boxes)
         gt_classes = torch.zeros((batch_size, n_db), dtype=torch.long).to(dev)
         img_scale = self.img_scale.unsqueeze(0)
-        scaled_default_boxes = self.db.to(dev) * img_scale / self.ds_factor
-        default_boxes_xy = cxcy_to_torch_xy(scaled_default_boxes)
+        scaled_default_boxes = self.db.to(dev)# * img_scale / self.ds_factor
+        default_boxes_xy = cxcy_to_xy(scaled_default_boxes)
         loss = -1
         debug_info["soft_maxed_pred"] = []
         """
@@ -96,7 +96,7 @@ class MultiBoxLoss(nn.Module):
             _, db_for_each_obj = overlap.max(dim=1)  # (N_objects)
             if self.debug:
                 debug_info["db_for_each_obj"].append(db_for_each_obj)
-                debug_info["default_box_for_each_obj"].append(default_boxes_xy[db_for_each_obj])
+                debug_info["matched_gt_boxes"].append(default_boxes_xy[db_for_each_obj])
             obj_for_each_db = obj_for_each_db.to(dev)
             obj_for_each_db_copy = obj_for_each_db.clone()
             db_for_each_obj = db_for_each_obj.to(dev)
@@ -123,14 +123,15 @@ class MultiBoxLoss(nn.Module):
             gt_classes[i] = self.label_each_db
 
             # Encode pred bboxes (finding the ground-truth offsets)
-            gt_xy_for_each_db = boxes[i][obj_for_each_db] * self.ds_factor
-            gt_cxcy_for_each_default_box = torch_xy_to_cxcy(gt_xy_for_each_db)
+            gt_xy_for_each_db = boxes[i][obj_for_each_db] #* self.ds_factor
+            gt_cxcy_for_each_default_box = xy_to_cxcy(gt_xy_for_each_db)
             # remember that we need to scale it back to normalised coordinates
-            gt_cxcy_for_each_default_box /= self.img_scale
+            # gt_cxcy_for_each_default_box /= self.img_scale
             # (N_def_boxes, 4)
             gt_locs[i] = encode_bboxes(gt_cxcy_for_each_default_box.to(dev), self.db.to(dev))
             if self.debug:
                 debug_info["gt_locs"].append(gt_locs[i])
+                # breakpoint()
                 pred_softmaxed = torch.nn.functional.softmax(cls_pred[i], dim=1)[db_for_each_obj]
                 debug_info["soft_maxed_pred"].append(pred_softmaxed)
             

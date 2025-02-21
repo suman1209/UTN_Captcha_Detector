@@ -11,10 +11,10 @@ with open(os.path.join(os.path.dirname(__file__), '..', '..', 'configs', 'config
 
 NUM_CLASSES = config['task_configs']['num_classes']
 # Number of anchors per grid cell
-NUM_DEFAULT_BOXES_PER_PIXEL = {'conv2_2': 3,
-                               'conv3_3': 3,
-                               'conv8_2': 3,
-                               'conv9_2': 3}
+NUM_DEFAULT_BOXES_PER_PIXEL = {'conv2_2': 4,
+                               'conv3_3': 4,
+                               'conv8_2': 4,
+                               'conv9_2': 4}
 
 
 class AuxiliaryConvolutions(nn.Module):
@@ -240,32 +240,45 @@ class SSDCaptcha(nn.Module):
         
         return pred_locs, pred_cls, self.fm_info
     
-    def generate_default_boxes(self, feature_map_shapes, aspect_ratios=[1.0, 2.0, 0.5]):
-        """
-        Generate default anchor boxes for each feature map.
-        :param feature_map_shapes: List of tuples (height, width) representing each feature map's dimensions.
-        :param aspect_ratios: List of aspect ratios to use for default boxes.
-        :return: Tensor of shape (n_boxes_per_pixel, 4) with box coordinates.
-        """
+    def generate_default_boxes(self, fmap_hw = {'conv2_2': [20, 80], 'conv3_3': [10, 40], 'conv8_2_feats': [5, 20], 'conv9_2_feats': [3, 10]}):
+        '''
+            Create 3610 default boxes in center-coordinate,
+            a tensor of dimensions (num_default_boxes, 4)
+        '''
+        device = "cuda"
+        
+        scales = {"conv2_2": 0.2, "conv3_3": 0.4, "conv8_2_feats":0.7 , "conv9_2_feats":0.9}
+
+        #ratio = h/w
+        aspect_ratios = {"conv2_2": [1., 2, 3, 0.5], "conv3_3": [1., 2, 3, 0.5], "conv8_2_feats": [1., 2, 3, 0.5] , "conv9_2_feats": [1., 2, 3, 0.5]}
+        
+        fmaps = list(fmap_hw.keys())
+        
         default_boxes = []
         
-        for feature_shape in feature_map_shapes:
-            print(feature_shape)
-            f_h, f_w = feature_shape  # Feature map height and width
-            for i in range(f_h):
-                for j in range(f_w):
-                    for ratio in aspect_ratios:
-                        # Center coordinates of the default box (normalized to [0,1])
-                        cx = (j + 0.5) / f_w
-                        cy = (i + 0.5) / f_h
-                        
-                        # Compute width and height of the default box based on aspect ratio
-                        w = 1.0 / f_w * ratio
-                        h = 1.0 / f_h / ratio
-                        
-                        default_boxes.append([cy, cx, h, w])
+        for k, fmap in enumerate(fmaps):
+            fm_height = fmap_hw[fmap][0]
+            fm_width = fmap_hw[fmap][1]
+            h_w_ratio = fm_height / fm_width
+            for ratio in aspect_ratios[fmap]:
+                for i in range(fmap_hw[fmap][0]):
+                    for j in range(fmap_hw[fmap][1]):
+                        cx = (i + 0.5) / fm_height
+                        cy = (j + 0.5) / fm_width
+                        # (cx, cy, w, h)
+                        h_scale = scales[fmap]
+                        # ratio = h/w
+                        # breakpoint()
+                        w_scale = h_scale * h_w_ratio
+                        w_scale = (1/ratio) * w_scale
+                        default_boxes.append([cy, cx, w_scale, h_scale]) 
         
-        return torch.tensor(default_boxes, dtype=torch.float32)  # Return as a PyTorch tensor
+        default_boxes = torch.FloatTensor(default_boxes).to(device) #(8732, 4)
+        default_boxes.clamp_(0, 1)
+        # if not self.debug:
+        #     assert default_boxes.size(0) == self.total_box_count, f"got {len(default_boxes)}, expected {self.total_box_count} boxes"
+        assert default_boxes.size(1) == 4
+        return default_boxes
 
 # Example usage:
 
