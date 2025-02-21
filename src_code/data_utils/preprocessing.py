@@ -81,8 +81,11 @@ def deprocess_image(tensor, mean=0.5, std=0.5):
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    # val Datawwwwww
+    # val_path = os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'images')
+    # output_path = os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'preprocessed')
     
-    # Test Data
+    # Test Datawwwwww
     # test_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'images')
     # output_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'preprocessed')
 
