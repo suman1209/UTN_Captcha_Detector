@@ -10,6 +10,8 @@ from src_code.data_utils.dataset_utils import CaptchaDataset
 from src_code.data_utils.preprocessing import *
 from src_code.task_utils.config_parser import ConfigParser
 from torch.optim.lr_scheduler import MultiStepLR, LinearLR
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class Metrics(object):
@@ -67,11 +69,23 @@ class CaptchaTrainer:
             # loss
             loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
 
+            # Extract and detach loss components
+            ce_loss = debug_info.get('ce_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
+            loc_loss = debug_info.get('loc_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
+            loss_value = loss.detach().cpu().item()
+            
             # Backward pass
             loss.backward()
 
+            self.optim.step()
+
+            # Update metrics
+            losses.update(loss.item(), images.size(0))
+            ce_losses.update(ce_loss, images.size(0))
+            loc_losses.update(loc_loss, images.size(0))
+
             if self.logger is not None:
-                self.logger.log({"train_loss": loss})
+                self.logger.log({"train_loss": loss, "ce_loss": ce_loss, "loc_loss": loc_loss})
                 # @todo add more things whenever needed
                 # self.logger.log({"ce_loss": debug_info['ce_loss']})
                 # self.logger.log({"loc_loss": debug_info['loc_loss']})
@@ -82,19 +96,19 @@ class CaptchaTrainer:
                 # avail_mem = avail_mem / 1e9
                 # self.logger.log({"gpu_free_mem": free_mem})
     
-            self.optim.step()
-            losses.update(loss.item(), images.size(0))
+            # self.optim.step()
+            # losses.update(loss.item(), images.size(0))
             # ce_losses.update(debug_info['ce_loss'], images.size(0))
             # loc_losses.update(debug_info['loc_loss'], images.size(0))
             # ce_pos_losses.update(debug_info['ce_pos_loss'], images.size(0))
             # ce_neg_losses.update(debug_info['ce_hard_neg_loss'], images.size(0))
             if i % self.config.print_freq == 0:                
-                print(f"Epoch: {epoch} avg Loss per epoch: {losses.avg:.4f}")
+                print(f"Epoch: {epoch} | Loss: {losses.avg:.4f} | CE Loss: {ce_losses.avg:.4f} | Loc Loss: {loc_losses.avg:.4f}")
                 # print(f"{debug_info = }")
             
             del loc_pred, cls_pred, images, boxes, labels, debug_info
             torch.cuda.empty_cache()
-        return losses
+        return losses, ce_losses, loc_losses
 
     def validation_step(self):
         self.model.eval()
@@ -108,13 +122,52 @@ class CaptchaTrainer:
     def fit(self):
         # Main Training loop
         scheduler = self.get_scheduler()
+        
+        # Lists to store loss values per epoch
+        total_losses = []
+        ce_losses = []
+        loc_losses = []
+        
         for epoch in range(self.start_epoch, self.config.epochs):
-            self.train_step(epoch)
+            loss, ce_loss, loc_loss = self.train_step(epoch)
+
+            # Store epoch-wise losses
+            total_losses.append(loss.avg)
+            ce_losses.append(ce_loss.avg)
+            loc_losses.append(loc_loss.avg)
+
+            # Run validation (if applicable)
             self.validation_step()
+
             if scheduler is not None:
                 scheduler.step()
                 print(f"{scheduler.get_last_lr() = }")
-    
+
+        # Plot the loss curves after training
+        self.plot_loss_curves(ce_losses, loc_losses)
+
+    def plot_loss_curves(self, ce_losses, loc_losses):
+        epochs = np.arange(1, len(ce_losses) + 1)
+
+        # Convert lists to NumPy arrays
+        ce_losses = np.array(ce_losses)
+        loc_losses = np.array(loc_losses)
+
+        plt.figure(figsize=(10, 5))
+
+        # Plot CE Loss
+        plt.plot(epochs, ce_losses, label='Cross Entropy Loss', marker='o', linestyle='-')
+
+        # Plot Localization Loss
+        plt.plot(epochs, loc_losses, label='Localization Loss', marker='s', linestyle='-')
+
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.title('Loss Breakdown: CE Loss vs Loc Loss')
+        plt.legend()
+        plt.grid()
+        plt.show()
+
     def get_scheduler(self):
         configs = self.config
         if configs.scheduler_name == "MultiStepLR":
