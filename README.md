@@ -29,6 +29,14 @@ First create the conda environment if it doesn't exist
 ```
 conda env create -f environment.yml
 ```
+Transfer the dataset to the cluster using the following command
+```
+cd $WORK
+scp -r <local_dataset_directory> alex:<remote_path>
+
+e.g. scp sample_img.png alex:/home/atuin/v123be/v123be12
+```
+
 Ensure main.py works in a quick interactive session
 
 ```
