@@ -1,4 +1,5 @@
 import time
+import random
 from abc import ABC, abstractmethod
 import torch.backends.cudnn as cudnn
 from torch import nn, optim
@@ -11,6 +12,9 @@ from src_code.data_utils.preprocessing import *
 from src_code.task_utils.config_parser import ConfigParser
 from torch.optim.lr_scheduler import MultiStepLR, LinearLR
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import wandb
+
 import numpy as np
 
 
@@ -68,6 +72,9 @@ class CaptchaTrainer:
         ce_pos_losses = Metrics()
         ce_neg_losses = Metrics()
         assert len(self.train_loader) > 0, f"{len(self.train_loader) = }"
+
+        only_once = False
+
         for i, (images, boxes, labels) in enumerate(self.train_loader):
             images = images.to(self.config.device)  # (batch_size (N), 3, 160, 640)
             images.requires_grad=True
@@ -76,6 +83,46 @@ class CaptchaTrainer:
             loc_pred, cls_pred, fm_info = self.model(images)
             # loss
             loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
+
+            if not only_once:
+                # rand image and draw the ground truth bbox and the matched default box
+                random_image = random.randint(0, images.shape[0] - 1)
+                img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
+
+                gt_boxes = boxes[random_image].cpu().numpy()
+
+                matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
+
+                # Image with bounding boxes
+                fig, ax = plt.subplots(1, figsize=(8, 4))
+                ax.imshow(img_np)
+
+                img_height, img_width, _ = img_np.shape
+
+                # Get ground truth boxes and scale to image size
+                gt_boxes[:, [0, 2]] *= img_width
+                gt_boxes[:, [1, 3]] *= img_height
+
+                # Plot ground truth boxes
+                # https://stackoverflow.com/questions/37435369/how-to-draw-a-rectangle-on-image
+                for box in gt_boxes:
+                    x_min, y_min, x_max, y_max = box
+                    rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='pink', facecolor='none')
+                    ax.add_patch(rect)
+
+                # Plot matched boxes
+                for box in matched_boxes:
+                    x_min, y_min, x_max, y_max = box
+                    rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='blue', facecolor='none')
+                    ax.add_patch(rect)
+
+                ax.legend()
+                ax.set_title(f"Image in epoch: {epoch}, step {i}")
+
+                wandb.log({"bbox_visual": wandb.Image(fig)})
+                plt.close(fig)
+
+            only_once = True
 
             # Extract and detach loss components
             ce_loss = debug_info.get('ce_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
