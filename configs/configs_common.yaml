@@ -20,7 +20,7 @@ data_configs:
 model_configs:
   checkpoint: null
   print_freq: 500
-  epochs: 10
+  epochs: 30
   batch_size: 32
   device: "cuda" # either "cpu" or "cuda"
   backbone:
@@ -36,9 +36,13 @@ model_configs:
     momentum: 0.9
     weight_decay: 0.0005
   scheduler:
-    name: MultiStepLR
-    milestones: [155, 195]
-    gamma: 0.1
+    name: 'LinearLR' # 'MultiStepLR' or 'LinearLR'
+    # only for MultiStepLR
+    milestones: [10, 20] # lr reduction whenever training hits the given epoch milestone
+    gamma: 0.1 # the factor by which the learning rate decreases
+    # only for LinearLR
+    start_factor: 0.5 # lr multiplicative factor increases from (start_factor to 1) in total_iter steps
+    total_iter: 4
 
 task_configs:
   img_height: 160 # original image height

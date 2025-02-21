@@ -41,7 +41,12 @@ class ConfigParser:
         self.print_freq = model_configs.get('print_freq')
         self.batch_size = model_configs.get("batch_size")
         self.epochs = model_configs.get("epochs")
-
+        scheduler_configs = model_configs.get("scheduler")
+        self.scheduler_name = scheduler_configs.get("name", None)
+        self.multistep_milestones = scheduler_configs.get("milestones", None)
+        self.multistep_gamma = scheduler_configs.get("gamma", None)
+        self.linearLR_start_factor = scheduler_configs.get("start_factor", None)
+        self.linearLR_total_iter = scheduler_configs.get("total_iter", None)
         loss_configs = model_configs.get("loss")
         self.pos_box_threshold = loss_configs.get("pos_box_threshold")
         self.neg_pos_hard_mining = loss_configs.get("hard_neg_pos")

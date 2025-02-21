@@ -9,6 +9,8 @@ from src_code.model_utils.ssd import SSDCaptcha
 from src_code.data_utils.dataset_utils import CaptchaDataset
 from src_code.data_utils.preprocessing import *
 from src_code.task_utils.config_parser import ConfigParser
+from torch.optim.lr_scheduler import MultiStepLR, LinearLR
+
 
 class Metrics(object):
     def __init__(self):
@@ -104,10 +106,35 @@ class CaptchaTrainer:
                 # @todo need to add the evaluation methods here.
 
     def fit(self):
-        for epoch in range(self.start_epoch, self.config.get_parser().epochs):
+        # Main Training loop
+        scheduler = self.get_scheduler()
+        for epoch in range(self.start_epoch, self.config.epochs):
             self.train_step(epoch)
             self.validation_step()
-        
+            if scheduler is not None:
+                scheduler.step()
+                print(f"{scheduler.get_last_lr() = }")
+    
+    def get_scheduler(self):
+        configs = self.config
+        if configs.scheduler_name == "MultiStepLR":
+            # milestone
+            ms = configs.multistep_milestones
+            gamma = configs.multistep_gamma
+            scheduler = MultiStepLR(self.optim, ms, gamma=gamma , verbose=True)
+        elif configs.scheduler_name == "LinearLR":
+            sf = self.config.linearLR_start_factor
+            total_iter = self.config.linearLR_total_iter
+            scheduler = LinearLR(self.optim, start_factor=sf, total_iters=total_iter)
+        else:
+            scheduler = None
+        # console print    
+        if scheduler is None:
+            print("No learning rate scheduler!")
+        else:
+            print(f"{scheduler} applied!")
+        return scheduler
+
 def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger):
     model = SSDCaptcha()
     # Initialize model or load checkpoint
@@ -124,6 +151,7 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
                     not_biases.append(param)
         optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * configs.lr}, {'params': not_biases}],
                                     lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
+        
     else:
         raise Exception("No support for checkpoint as of now!")
     # a dummy forward method to calculate the default boxes
