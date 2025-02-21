@@ -86,7 +86,7 @@ if __name__ == "__main__":
     # test_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'images')
     # output_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'preprocessed')
 
-    # Train Datawwwwww
+    # Train Data
     train_path = os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'images')
     output_path = os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'preprocessed')
 
