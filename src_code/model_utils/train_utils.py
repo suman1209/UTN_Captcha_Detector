@@ -40,7 +40,7 @@ class CaptchaTrainer:
                  loss_fn: nn.Module,
                  optimizer: optim,
                  config: ConfigParser,
-                 logger = None
+                 logger = None, checkpoint_path = "checkpoints"
                  ):
         self.model = model
         self.train_loader = train_loader
@@ -51,6 +51,14 @@ class CaptchaTrainer:
         self.config = config
         self.logger = logger
         self.start_epoch = 0  # Default start epoch
+        self.checkpoint_path = checkpoint_path
+
+        # Ensure checkpoint directory exists
+        os.makedirs(self.checkpoint_path, exist_ok=True)
+
+        # Load checkpoint if available
+        if hasattr(config, "checkpoint") and config.checkpoint is not None:
+            self.load_checkpoint(config.checkpoint)
 
     def train_step(self, epoch):
         self.model.to(self.config.device)
@@ -130,6 +138,35 @@ class CaptchaTrainer:
                 locs_pred, cls_pred, fm_info = self.model(images)
                 # @todo need to add the evaluation methods here.
 
+    def save_checkpoint(self, epoch, filename="model_checkpoint.pth"):
+        """Saves model checkpoint."""
+        checkpoint = {
+            "epoch": epoch,
+            "model_state": self.model.state_dict(),
+            "optimizer_state": self.optim.state_dict(),
+            "config": self.config
+        }
+        save_path = os.path.join(self.checkpoint_path, filename)
+        torch.save(checkpoint, save_path)
+        # print(f"Checkpoint saved at {save_path}")
+
+    def load_checkpoint(self, filename="model_checkpoint.pth"):
+        """Loads model checkpoint if available."""
+        # Ensure the filename is a correct absolute path
+        if not os.path.isabs(filename):  
+            load_path = filename
+        else:
+            load_path = os.path.join("checkpoints", filename) 
+
+        if os.path.exists(load_path):
+            checkpoint = torch.load(load_path, map_location=self.config.device)
+            self.model.load_state_dict(checkpoint["model_state"])
+            self.optim.load_state_dict(checkpoint["optimizer_state"])
+            self.start_epoch = checkpoint["epoch"] + 1
+            print(f"Checkpoint loaded from {load_path} (starting from epoch {self.start_epoch})")
+        else:
+            print(f"No checkpoint found at {load_path}. Training from scratch.")
+    
     def fit(self):
         scheduler = self.get_scheduler()
 
@@ -150,6 +187,9 @@ class CaptchaTrainer:
             ce_pos_losses.append(ce_pos_loss.avg)
             ce_neg_losses.append(ce_neg_loss.avg)
 
+            # Save checkpoint at every epoch
+            self.save_checkpoint(epoch)
+            
             # Run validation (if applicable)
             self.validation_step()
 
@@ -212,23 +252,18 @@ class CaptchaTrainer:
 
 def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger):
     model = SSDCaptcha()
-    # Initialize model or load checkpoint
-    if not hasattr(configs, "checkpoint") or configs.checkpoint is None:
-        start_epoch = 0
-        # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
-        biases = list()
-        not_biases = list()
-        for param_name, param in model.named_parameters():
-            if param.requires_grad:
-                if param_name.endswith('.bias'):
-                    biases.append(param)
-                else:
-                    not_biases.append(param)
-        optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * configs.lr}, {'params': not_biases}],
-                                    lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
+    # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
+    biases = list()
+    not_biases = list()
+    for param_name, param in model.named_parameters():
+        if param.requires_grad:
+            if param_name.endswith('.bias'):
+                biases.append(param)
+            else:
+                not_biases.append(param)
+    optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * configs.lr}, {'params': not_biases}],
+                                lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
         
-    else:
-        raise Exception("No support for checkpoint as of now!")
     # a dummy forward method to calculate the default boxes
     
     test_input = torch.randn(1, 1, 40, 160)  # Maintain rectangular aspect ratio
