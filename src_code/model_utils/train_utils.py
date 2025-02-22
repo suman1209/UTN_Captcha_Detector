@@ -143,7 +143,7 @@ class CaptchaTrainer:
         self.model.to(self.config.device)
         only_once = False
         with torch.no_grad():
-            for i, (images, boxes, labels) in enumerate(self.test_loader):
+            for i, (images, boxes, labels) in enumerate(self.val_loader):
                 images = images.to(self.config.device) 
                 loc_pred, cls_pred, fm_info = self.model(images)
                 loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
