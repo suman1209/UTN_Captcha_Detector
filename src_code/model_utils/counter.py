@@ -1,5 +1,5 @@
 import random
-
+import matplotlib.patches as patches
 from matplotlib import pyplot as plt
 from backbone import VGG16Backbone
 import torch
@@ -27,8 +27,8 @@ configs_dict = {
             "downscale_factor": 4,
         },
         "dataset_related": {
-            "preprocessed_dir": "../../datasets/utn_dataset_curated/part2/train/preprocessed",
-            "labels_dir": "../../datasets/utn_dataset_curated/part2/train/labels",
+            "preprocessed_dir": "../../datasets/utn_dataset/part2/train/preprocessed",
+            "labels_dir": "../../datasets/utn_dataset/part2/train/labels",
             "augment": True,
             "shuffle": False,
         },
@@ -40,7 +40,7 @@ configs_dict = {
         },
     },
     "model_configs": {
-        "epochs": 100,
+        "epochs": 30,
         "batch_size": 32,
         "device": "cuda",  # either "cpu" or "cuda"
         "checkpoint": None,
@@ -55,7 +55,7 @@ configs_dict = {
         },
         "optim": {
             "name": "SGD",
-            "lr": 0.001,
+            "lr": 0.0001,
             "momentum": 0.9,
             "weight_decay": 0.0005,
         },
@@ -105,7 +105,7 @@ class Trainer:
         self.device = device
         self.config = config
         self.loss_function = nn.MSELoss()
-        self.optimizer = optim.Adam(self.model.parameters(), lr = 1e-3)
+        self.optimizer = optim.Adam(self.model.parameters(), lr = config.lr)
         self.checkpoint_path = "./"
         
     def backbone_train(self):
@@ -134,29 +134,42 @@ class Trainer:
         total_loss = 0
 
         with torch.no_grad(): 
+            
             for image, bboxes, labels in self.val_loader:
-                targets = torch.tensor([len(bb) for bb in bboxes])
-                breakpoint()
-                image, targets = image.to(self.device), targets.to(self.device, dtype=torch.float32).unsqueeze(1)
                 random_image = random.randint(0, image.shape[0] - 1)
+                targets = torch.tensor([len(bb) for bb in bboxes])
+                image, targets = image.to(self.device), targets.to(self.device, dtype=torch.float32).unsqueeze(1)
+                
                 # Forward pass
-                pred = round(self.model(image)[random_image].item(), 2)
-                gt = targets[random_image]
-                img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
+                pred = round(self.model(image)[random_image].item(), 5)
+                gt = targets[random_image].item()
+                gt_boxes = bboxes[random_image].cpu().numpy()
+                img_np = image[random_image].cpu().detach().numpy().transpose(1, 2, 0)
+                img_height, img_width, _ = img_np.shape
+
+                # Get ground truth boxes and scale to image size
+                gt_boxes[:, [0, 2]] *= img_width
+                gt_boxes[:, [1, 3]] *= img_height
+                
                 # just for one image
                 # Image with bounding boxes
                 fig, ax = plt.subplots(1, figsize=(8, 4))
                 ax.imshow(img_np, cmap="gray")
+                for box in gt_boxes:
+                    x_min, y_min, x_max, y_max = box
+                    rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='pink', facecolor='none')
+                    ax.add_patch(rect)
+
                 ax.legend()
                 ax.set_title(f"GT_COUNT: {gt}, PRED: {pred}")
                 wandb.log({"COUNT: Validation": wandb.Image(fig)})
                 plt.close(fig)
-
+                break
         average_loss = total_loss / len(self.val_loader)
         print(f"Validation Loss: {average_loss:}")
 
     def train(self):
-        save_epochs = [25, 50, 75, 100]
+        save_epochs = [10, 25, 50, 75, 100]
         for epoch in range(self.config.epochs):
             self.backbone_train()
             self.backbone_validation()

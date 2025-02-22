@@ -10,11 +10,14 @@ from src_code.model_utils.ssd import SSDCaptcha
 from src_code.data_utils.dataset_utils import CaptchaDataset
 from src_code.data_utils.preprocessing import *
 from src_code.task_utils.config_parser import ConfigParser
+from src_code.data_utils.dataset_utils import category_id_labels
 from torch.optim.lr_scheduler import MultiStepLR, LinearLR
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import wandb
-
+import os
+os.environ['WANDB_CACHE_DIR'] = "./"
+os.environ['WANDB_DATA_DIR'] = "./"
 import numpy as np
 
 
@@ -73,8 +76,6 @@ class CaptchaTrainer:
         ce_neg_losses = Metrics()
         assert len(self.train_loader) > 0, f"{len(self.train_loader) = }"
 
-        only_once = False
-
         for i, (images, boxes, labels) in enumerate(self.train_loader):
             images = images.to(self.config.device)  # (batch_size (N), 3, 160, 640)
             images.requires_grad=True
@@ -84,17 +85,7 @@ class CaptchaTrainer:
             # loss
             loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
 
-            if not only_once:
-                # rand image and draw the ground truth bbox and the matched default box
-                random_image = random.randint(0, images.shape[0] - 1)
-                img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
-
-                gt_boxes = boxes[random_image].cpu().numpy()
-
-                matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
-                self.plot_bb(img_np, gt_boxes, matched_boxes, epoch, i)
-                only_once = True
-
+            
             # Extract and detach loss components
             ce_loss = debug_info.get('ce_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
             loc_loss = debug_info.get('loc_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
@@ -147,14 +138,32 @@ class CaptchaTrainer:
             torch.cuda.empty_cache()
         return losses, ce_losses, loc_losses, ce_pos_losses, ce_neg_losses
 
-    def validation_step(self):
+    def validation_step(self, epoch):
         self.model.eval()
         self.model.to(self.config.device)
+        only_once = False
         with torch.no_grad():
             for i, (images, boxes, labels) in enumerate(self.test_loader):
                 images = images.to(self.config.device) 
-                locs_pred, cls_pred, fm_info = self.model(images)
-                # @todo need to add the evaluation methods here.
+                loc_pred, cls_pred, fm_info = self.model(images)
+                loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
+                str_labels = ["".join([category_id_labels[i.item()] for i in label]) for label in labels]
+                if not only_once:
+                    # rand image and draw the ground truth bbox and the matched default box
+                    random_image = 0#random.randint(0, images.shape[0] - 1)
+                    img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
+                    label = str_labels[random_image]
+                    gt_boxes = boxes[random_image].cpu().numpy()
+
+                    matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
+                    self.plot_bb(img_np, gt_boxes, matched_boxes, f"epoch={epoch} label = {label}", i)
+                    logits = debug_info["soft_maxed_pred"][random_image]
+                    GT_int = labels[random_image].tolist()
+                    GT_str = str_labels[random_image]
+                    my_table = wandb.Table(columns=["GT"] + list(category_id_labels.values()) + ["bg"], data=[[f"{GT_str[i]}-{GT_int[i]}"] + logit.tolist() for i, logit in enumerate(logits)])
+                    self.logger.log({f"logits outputed: {epoch = }": my_table})
+                    break
+
 
     def save_checkpoint(self, epoch, filename="model_checkpoint.pth"):
         """Saves model checkpoint."""
@@ -206,13 +215,13 @@ class CaptchaTrainer:
             ce_neg_losses.append(ce_neg_loss.avg)
 
             # Save checkpoint at every epoch
-            self.save_checkpoint(epoch)
+            # self.save_checkpoint(epoch)
             
             # Run validation (if applicable)
-            self.validation_step()
+            self.validation_step(epoch)
 
             if scheduler is not None:
-                scheduler.step()
+                scheduler.step(epoch)
                 # print(f"{scheduler.get_last_lr() = }")
 
         # Plot the loss curves after training
@@ -301,7 +310,7 @@ class CaptchaTrainer:
 
         ax.legend()
         ax.set_title(f"Image in epoch: {epoch}, step {i}")
-        wandb.log({"bbox_visual": wandb.Image(fig)})
+        wandb.log({f"bbox_visual-{epoch =}": wandb.Image(fig)})
         plt.close(fig)
     
 def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger):

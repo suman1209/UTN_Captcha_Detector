@@ -209,7 +209,7 @@ class SSDCaptcha(nn.Module):
         
         # Backbone Network (VGG16-based feature extractor)
         # self.backbone = VGG16Backbone(pretrained=False)
-        self.backbone = self.load_backbone(checkpoint_path="./src_code/model_utils/vgg_counter_checkpoint.pth")
+        self.backbone = self.load_backbone(checkpoint_path="./src_code/model_utils/vgg_counter_checkpoint_2025-02-22_01-54-43.pth")
         
         # Auxiliary Network (extra feature maps for detecting smaller objects)
         self.auxiliary_convs = AuxiliaryConvolutions()

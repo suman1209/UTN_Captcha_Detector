@@ -154,6 +154,7 @@ class MultiBoxLoss(nn.Module):
 
         # number of positive and hard-negative default boxes per image
         n_positive = pos_db.sum(dim=1)
+        debug_info["n_positive"] = n_positive
         n_hard_negatives = self.neg_pos * n_positive
         if self.debug:
             debug_info["n_positive"] = n_positive
