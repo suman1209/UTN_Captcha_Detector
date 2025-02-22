@@ -48,21 +48,21 @@ label_map['background'] = 36
 
 
 class CaptchaDataset(VisionDataset):
-    def __init__(self, config):
+    def __init__(self, preprocessed_dir, labels_dir=None, augment=True, config=None):
         """
         Captcha Dataset for loading preprocessed data
 
         preprocessed_dir: preprocessed tensors
         labels_dir: label files
         """
-        super().__init__(config.preprocessed_dir)
+        super().__init__(preprocessed_dir)
 
-        self.preprocessed_dir = config.preprocessed_dir
-        self.labels_dir = config.labels_dir
-        self.augment = config.augment
-        self.augmentations = Augmentations(config)
+        self.preprocessed_dir = preprocessed_dir
+        self.labels_dir = labels_dir
+        self.augment = augment
+        self.augmentations = Augmentations(config) if augment else None
 
-        self.image_names = sorted([f for f in os.listdir(config.preprocessed_dir) if f.endswith(".pt")])
+        self.image_names = sorted([f for f in os.listdir(preprocessed_dir) if f.endswith(".pt")])
 
     def load_labels(self, image_name):
         """
@@ -109,21 +109,24 @@ class CaptchaDataset(VisionDataset):
         image = torch.load(preprocessed_path)
 
         # Load bounding boxes and labels
-        orig_bboxes, labels = self.load_labels(img_name)
+        if self.labels_dir:
+            orig_bboxes, labels = self.load_labels(img_name)
 
-        bboxes = torch.tensor(orig_bboxes, dtype=torch.float32)
+            bboxes = torch.tensor(orig_bboxes, dtype=torch.float32)
 
-        labels = torch.tensor(labels, dtype=torch.int64)
+            labels = torch.tensor(labels, dtype=torch.int64)
 
-        # apply augmentations
-        if self.augment:
-            image, bboxes, labels = self.augmentations.apply(image, bboxes, labels)
+            # apply augmentations
+            if self.augment:
+                image, bboxes, labels = self.augmentations.apply(image, bboxes, labels)
 
-        # Zoom augmentation: if after zooming no object (and bbox) is left: skip the image
-        if bboxes.numel() == 0:
-            return self.__getitem__((idx + 1) % len(self.image_names))
+            # Zoom augmentation: if after zooming no object (and bbox) is left: skip the image
+            if bboxes.numel() == 0:
+                return self.__getitem__((idx + 1) % len(self.image_names))
 
-        return image, bboxes, labels
+            return image, bboxes, labels
+        else:
+            return image
 
 
 def get_dataloader(dataset, config) -> torch.utils.data.DataLoader:
@@ -143,6 +146,10 @@ def collate_fn(batch):
     """
     Function to handle variable-sized data.
     """
-    images, bboxes, labels = zip(*batch)
-    images = torch.stack(images, dim=0)
-    return images, list(bboxes), list(labels)
+    if isinstance(batch[0], tuple):  
+        images, bboxes, labels = zip(*batch)
+        images = torch.stack(images, dim=0)
+        return images, list(bboxes), list(labels)
+    else:
+        images = torch.stack(batch, dim=0)
+        return images

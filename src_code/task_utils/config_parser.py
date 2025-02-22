@@ -19,8 +19,11 @@ class ConfigParser:
 
         # dataset configs
         dataset_config = data_configs.get("dataset_related")
-        self.preprocessed_dir = dataset_config.get("preprocessed_dir")
-        self.labels_dir = dataset_config.get("labels_dir")
+        self.train_preprocessed_dir = dataset_config.get("train_preprocessed_dir")
+        self.val_preprocessed_dir = dataset_config.get("val_preprocessed_dir")
+        self.test_preprocessed_dir = dataset_config.get("test_preprocessed_dir")
+        self.train_labels_dir = dataset_config.get("train_labels_dir")
+        self.val_labels_dir = dataset_config.get("val_labels_dir")
         self.augment = dataset_config.get("augment")
         self.shuffle = dataset_config.get("shuffle")
 

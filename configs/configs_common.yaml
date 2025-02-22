@@ -7,18 +7,21 @@ data_configs:
     std: 0.5 # for raw_image normalisation
     downscale_factor: 4
   dataset_related:
-    preprocessed_dir: "datasets/utn_dataset_curated/part2/train/preprocessed"
-    labels_dir: "datasets/utn_dataset_curated/part2/train/labels"
+    train_preprocessed_dir: "datasets/utn_dataset_curated/part2/train/preprocessed"
+    val_preprocessed_dir: "datasets/utn_dataset_curated/part2/val/preprocessed"
+    test_preprocessed_dir: "datasets/utn_dataset_curated/part2/test/preprocessed"
+    train_labels_dir: "datasets/utn_dataset_curated/part2/train/labels"
+    val_labels_dir: "datasets/utn_dataset_curated/part2/val/labels"
     augment: True
     shuffle: False
   augmentation_related:
     flip_prob: 0.5
     scale_range: (0.8, 1.2)
     zoom_prob: 0.3
-    saturation_prob: 0.2
+    saturation_prob: 0
 
 model_configs:
-  checkpoint: null  # Training from Scratch
+  checkpoint: null # Training from Scratch
   # checkpoint: "checkpoints/model_checkpoint.pth"  # Resume training from last saved epoch
   print_freq: 500
   epochs: 30
@@ -37,7 +40,7 @@ model_configs:
     momentum: 0.9
     weight_decay: 0.0005
   scheduler:
-    name: 'LinearLR' # 'MultiStepLR' or 'LinearLR'
+    name: "LinearLR" # 'MultiStepLR' or 'LinearLR'
     # only for MultiStepLR
     milestones: [10, 20] # lr reduction whenever training hits the given epoch milestone
     gamma: 0.1 # the factor by which the learning rate decreases

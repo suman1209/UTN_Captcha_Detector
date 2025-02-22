@@ -24,9 +24,26 @@ def main(config_path: str | Path | None = None) -> None:
     print("### Creating Dataloaders ###")
 
     # Create datasets
-    train_dataset = CaptchaDataset(configs)
-    val_dataset = CaptchaDataset(configs)
-    test_dataset = CaptchaDataset(configs)
+    train_dataset = CaptchaDataset(
+        configs.train_preprocessed_dir,
+        configs.train_labels_dir,
+        augment=True,
+        config=configs
+    )
+
+    val_dataset = CaptchaDataset(
+        configs.val_preprocessed_dir,
+        configs.val_labels_dir,
+        augment=False,
+        config=configs
+    )
+
+    test_dataset = CaptchaDataset(
+        configs.test_preprocessed_dir,
+        labels_dir=None,
+        augment=False,
+        config=configs
+    )
 
     # Create data loaders
     train_loader = get_dataloader(train_dataset, configs)
