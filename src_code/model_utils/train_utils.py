@@ -123,7 +123,6 @@ class CaptchaTrainer:
                 # avail_mem = avail_mem / 1e9
                 # self.logger.log({"gpu_free_mem": free_mem})
     
-            # self.optim.step()
             # losses.update(loss.item(), images.size(0))
             # ce_losses.update(debug_info['ce_loss'], images.size(0))
             # loc_losses.update(debug_info['loc_loss'], images.size(0))
@@ -155,8 +154,12 @@ class CaptchaTrainer:
                     label = str_labels[random_image]
                     gt_boxes = boxes[random_image].cpu().numpy()
 
-                    matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
-                    self.plot_bb(img_np, gt_boxes, matched_boxes, f"epoch={epoch} label = {label}", i)
+                    # matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
+                    # to draw all the positive boxes that have been matched
+                    matched_boxes = debug_info["pos_default_boxes"][random_image].cpu().numpy()
+                    neg_boxes = debug_info["hardneg_default_boxes"][random_image].cpu().numpy()
+                    pb = len(matched_boxes)
+                    self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, f"epoch={epoch} label = {label} num_pos_boxes={pb}", i)
                     logits = debug_info["soft_maxed_pred"][random_image]
                     GT_int = labels[random_image].tolist()
                     GT_str = str_labels[random_image]
@@ -182,7 +185,7 @@ class CaptchaTrainer:
 
         # Create a figure with subplots
         fig, axes = plt.subplots(num_rows, num_cols, figsize=(10, 5 * num_rows))
-        fig.suptitle("Bar Plots for Each Row", fontsize=16)
+        fig.suptitle(f"Bar Plots for Each Row {epoch = }", fontsize=16)
 
         # If there's only one row, axes will not be an array, so we wrap it in a list
         if num_rows == 1:
@@ -322,7 +325,7 @@ class CaptchaTrainer:
             
         return scheduler
     
-    def plot_bb(self, img_np, gt_boxes, matched_boxes, epoch, i):
+    def plot_bb(self, img_np, gt_boxes, matched_boxes, neg_boxes, epoch, i):
         # Image with bounding boxes
         fig, ax = plt.subplots(1, figsize=(8, 4))
         ax.imshow(img_np, cmap="gray")
@@ -338,7 +341,10 @@ class CaptchaTrainer:
         matched_boxes[:, [0, 2]] *= img_width
         matched_boxes[:, [1, 3]] *= img_height
 
-
+        # Get ground truth boxes and scale to image size
+        neg_boxes[:, [0, 2]] *= img_width
+        neg_boxes[:, [1, 3]] *= img_height
+        
         # Plot ground truth boxes
         # https://stackoverflow.com/questions/37435369/how-to-draw-a-rectangle-on-image
         for box in gt_boxes:
@@ -350,6 +356,12 @@ class CaptchaTrainer:
         for box in matched_boxes:
             x_min, y_min, x_max, y_max = box
             rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='blue', facecolor='none')
+            ax.add_patch(rect)
+        
+        # Plot neg boxes
+        for box in neg_boxes:
+            x_min, y_min, x_max, y_max = box
+            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='red', facecolor='none')
             ax.add_patch(rect)
 
         ax.legend()

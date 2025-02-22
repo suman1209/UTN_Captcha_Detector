@@ -41,6 +41,8 @@ class MultiBoxLoss(nn.Module):
         debug_info["matched_gt_boxes"] = []
         debug_info["gt_locs"] = []
         debug_info["default_box_for_each_obj"] = []
+        debug_info["pos_default_boxes"] = []
+        
         return debug_info
 
     def forward(self, locs_pred, cls_pred, boxes, labels, downscale_factor=4):
@@ -154,11 +156,12 @@ class MultiBoxLoss(nn.Module):
 
         # number of positive and hard-negative default boxes per image
         n_positive = pos_db.sum(dim=1)
-        debug_info["n_positive"] = n_positive
         n_hard_negatives = self.neg_pos * n_positive
         if self.debug:
             debug_info["n_positive"] = n_positive
             debug_info["n_hard_negatives"] = n_hard_negatives
+            debug_info["pos_default_boxes"] = [default_boxes_xy[pos_db[i]] for i in range(pos_db.size(0))]
+        
         # Find the loss for all priors
         cross_entropy_loss = nn.CrossEntropyLoss(reduce=False)
         pred = cls_pred.view(-1, num_classes)
@@ -189,6 +192,7 @@ class MultiBoxLoss(nn.Module):
         hard_negatives = hardness_ranks < n_hard_negatives.unsqueeze(1)
         if self.debug:
             debug_info["hard_negatives"] = hard_negatives
+            debug_info["hardneg_default_boxes"] = [default_boxes_xy[hard_negatives[i]] for i in range(hard_negatives.size(0))]
         num_pos_boxes = n_positive.sum().float()
         confidence_hard_neg_loss = conf_neg_loss[hard_negatives]
         total_sum = confidence_hard_neg_loss.sum() + confidence_pos_loss.sum()
