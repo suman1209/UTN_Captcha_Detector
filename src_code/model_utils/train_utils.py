@@ -374,12 +374,37 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
     # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
     biases = list()
     not_biases = list()
-    for param_name, param in model.named_parameters():
-        if param.requires_grad:
-            if param_name.endswith('.bias'):
-                biases.append(param)
-            else:
-                not_biases.append(param)
+    freeze_param_names = [
+    "backbone.conv1_1.weight", "backbone.conv1_1.bias",
+    "backbone.conv1_2.weight", "backbone.conv1_2.bias",
+    "backbone.conv2_1.weight", "backbone.conv2_1.bias",
+    "backbone.conv2_2.weight", "backbone.conv2_2.bias",
+    "backbone.conv3_1.weight", "backbone.conv3_1.bias",
+    "backbone.conv3_2.weight", "backbone.conv3_2.bias",
+    "backbone.conv3_3.weight", "backbone.conv3_3.bias",
+    "backbone.conv4_1.weight", "backbone.conv4_1.bias",
+    "backbone.conv4_2.weight", "backbone.conv4_2.bias",
+    "backbone.conv4_3.weight", "backbone.conv4_3.bias",
+    "backbone.conv5_1.weight", "backbone.conv5_1.bias",
+    "backbone.conv5_2.weight", "backbone.conv5_2.bias",
+    "backbone.conv5_3.weight", "backbone.conv5_3.bias",
+    "backbone.conv6.weight", "backbone.conv6.bias",
+    "backbone.conv7.weight", "backbone.conv7.bias"
+]   
+    freeze_backbone = False
+    if freeze_backbone:
+        freezed_params_groups = 0    
+        for param_name, param in model.named_parameters():
+            if param.requires_grad:
+                if param_name.endswith('.bias'):
+                    biases.append(param)
+                else:
+                    not_biases.append(param)
+            if param_name  in freeze_param_names:
+                freezed_params_groups += 1
+                print(f"freezing: {param_name}")
+                param.requires_grad = False
+        print(f"freezed total of : {freezed_params_groups} groups")
     optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * configs.lr}, {'params': not_biases}],
                                 lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
         
@@ -389,7 +414,7 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
     # feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
     default_boxes = model.generate_default_boxes()
     loss_fn = MultiBoxLoss(default_boxes=default_boxes, config=configs)
-
+    logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
     trainer = CaptchaTrainer(model, train_loader, val_loader, test_loader, loss_fn, optimizer, configs, logger)
     
     # train
