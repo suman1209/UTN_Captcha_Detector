@@ -161,10 +161,54 @@ class CaptchaTrainer:
                     GT_int = labels[random_image].tolist()
                     GT_str = str_labels[random_image]
                     my_table = wandb.Table(columns=["GT"] + list(category_id_labels.values()) + ["bg"], data=[[f"{GT_str[i]}-{GT_int[i]}"] + logit.tolist() for i, logit in enumerate(logits)])
-                    self.logger.log({f"logits outputed: {epoch = }": my_table})
-                    break
+                    # self.logger.log({f"logits outputed: {epoch = }": my_table})
+                    self.log_logits(my_table, epoch)
+                break
 
+    def log_logits(self, my_table, epoch):
+        """this code was generated using deepseek with the following prompt: 
+        
+        my_table = wandb.Table(columns=["GT"] + list(category_id_labels.values()) + ["bg"], data=[[f"{GT_str[i]}-{GT_int[i]}"] + logit.tolist() for i, logit in enumerate(logits)])
+        i want a bar plot for each row, and all the bar plots in a single image divided by grids
+        
+        """
+        columns = my_table.columns
+        data = my_table.data
 
+        # Determine the number of rows and columns for the grid
+        num_rows = len(data)
+        num_cols = 1  # One column for each row's bar plot
+        grid_size = (num_rows, num_cols)
+
+        # Create a figure with subplots
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(10, 5 * num_rows))
+        fig.suptitle("Bar Plots for Each Row", fontsize=16)
+
+        # If there's only one row, axes will not be an array, so we wrap it in a list
+        if num_rows == 1:
+            axes = [axes]
+
+        # Plot bar plots for each row
+        for row_idx, row in enumerate(data):
+            # Extract the row data (skip the first column, which is "GT")
+            row_values = [float(x) for x in row[1:]]
+            row_labels = columns[1:]  # Skip the "GT" column
+
+            # Create a bar plot for the current row
+            ax = axes[row_idx]
+            ax.bar(row_labels, row_values)
+            ax.set_title(f"Row {row_idx + 1} ({row[0]})")  # Use the "GT" value as the title
+            ax.set_ylabel("Value")
+            ax.tick_params(axis='x', rotation=45)  # Rotate x-axis labels for better readability
+
+        # Adjust layout to prevent overlap
+        plt.tight_layout(rect=[0, 0, 1, 0.96])  # Leave space for the suptitle
+
+        # Log the figure to wandb
+        self.logger.log({f"Bar Plots {epoch = }": wandb.Image(fig)})
+
+        # Close the figure to free up memory
+        plt.close(fig)
     def save_checkpoint(self, epoch, filename="model_checkpoint.pth"):
         """Saves model checkpoint."""
         checkpoint = {
