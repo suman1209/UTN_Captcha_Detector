@@ -13,4 +13,4 @@ conda env update --file environment.yml  --prune # update environment if require
 python -c "import torch; print('cuda available:', torch.cuda.is_available())"
 print("starting the program!")
 # run the main program
-python main_copy.py configs/configs_common_full.yaml
+python main.py configs/configs_common_full.yaml
