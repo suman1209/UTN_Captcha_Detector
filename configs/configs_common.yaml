@@ -21,11 +21,12 @@ data_configs:
     saturation_prob: 0
 
 model_configs:
+  name: "ssd_mnist" # "ssd_mnist" or "ssd_captcha"
   checkpoint: null # Training from Scratch
   # checkpoint: "checkpoints/model_checkpoint.pth"  # Resume training from last saved epoch
   print_freq: 500
   epochs: 10
-  batch_size: 32
+  batch_size: 2
   device: "cuda" # either "cpu" or "cuda"
   backbone:
     name: VGG16

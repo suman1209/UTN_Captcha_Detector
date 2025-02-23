@@ -4,7 +4,8 @@ import torch.nn.utils.spectral_norm as spectral_norm
 import pandas as pd
 import numpy as np
 basic_conv = nn.Conv2d #change this to 3d if needed 
-from .utils_mnist_ssd import cxcy_to_xy, cxcy_to_gcxgcy,  gcxgcy_to_cxcy, find_jaccard_overlap, xy_to_cxcy, class_label
+from .utils_mnist_ssd import cxcy_to_gcxgcy,  gcxgcy_to_cxcy, class_label
+from .utils import cxcy_to_xy, find_IoU, xy_to_cxcy
 import torch.nn.functional as F
 #generally useful
 class Pad_to_even_size(nn.Module):
@@ -20,7 +21,7 @@ class Pad_to_even_size(nn.Module):
                 a = [0,0] + a
         return torch.nn.functional.pad(x, a)
 
-def pretty_print_module_list(module_list, x, print_net=True, max_colwidth=500):
+def pretty_print_module_list(module_list, x, print_net=False, max_colwidth=500):
     '''x: dummyinput [batch=1, C, H, W]'''
     pd.options.display.max_colwidth = max_colwidth
     df = pd.DataFrame({'Layer': list(map(str, module_list))})
@@ -289,13 +290,13 @@ class SSD(nn.Module):
                 # print('decoded_locs.size() = ', decoded_locs.size(), above_min_score_index.size(), sorted_index.size())
 
                 keep = torch.ones_like(sorted_score, dtype=torch.uint8).to(self.configs.device) #[n_p_min]
-                iou = find_jaccard_overlap(decoded_locs[above_min_score_index][sorted_index], 
+                iou = find_IoU(decoded_locs[above_min_score_index][sorted_index], 
                                                  decoded_locs[above_min_score_index][sorted_index]) #[n_p_min, n_p_min]
                 # print(rev_label_map[c], iou)
                 for j in range(len(sorted_index)-1):
                     if keep[j] == 1:
                         keep[j+1:] = torch.min(keep[j+1:], iou[j, j+1:] <= max_overlap)
-                # print(find_jaccard_overlap(decoded_locs[above_min_score_index][sorted_index][keep], 
+                # print(find_IoU(decoded_locs[above_min_score_index][sorted_index][keep], 
                 #                                  decoded_locs[above_min_score_index][sorted_index][keep])) #[n_p_min, n_p_min])
                 image_boxes.append(decoded_locs[above_min_score_index][sorted_index][keep])  
                 image_labels += [c] * keep.sum()
@@ -360,7 +361,7 @@ class MultiBoxLossSSD(nn.Module):
             debug_info["num_images"] = len(boxes)
         for i in range(len(boxes)): #for each image in batch
             n_object = len(boxes[i])
-            iou = find_jaccard_overlap(boxes[i], self.priors_xy) #(n_object, n_p)
+            iou = find_IoU(boxes[i], self.priors_xy) #(n_object, n_p)
             max_overlap_for_each_prior, object_for_each_prior = iou.max(dim=0) #[n_p], [n_p]
 
             #make sure all gt boxes corresponds to at least one prior

@@ -15,12 +15,13 @@ data_configs:
     augment: True
     shuffle: False
   augmentation_related:
-    flip_prob: 0.5
+    flip_prob: 0.35
     scale_range: (0.8, 1.2)
     zoom_prob: 0.3
     saturation_prob: 0
 
 model_configs:
+  name: "ssd_mnist" # "ssd_mnist" or "ssd_captcha"
   checkpoint: null # Training from Scratch
   # checkpoint: "checkpoints/model_checkpoint.pth"  # Resume training from last saved epoch
   print_freq: 500
@@ -28,14 +29,14 @@ model_configs:
   batch_size: 32
   device: "cuda" # either "cpu" or "cuda"
   backbone:
-    name: VGG16
+    name: "VGG16"
     num_stages: 6
   loss:
     alpha: 0.25 # loss = alpha*loc_loss + cls_loss
     pos_box_threshold: 0.5 # a default box is marked positive if it has (> pos_box_threshold) IoU score with any of the groundtruth boxes
     hard_neg_pos: 3 # num of negative boxes = hard_neg_pos * num_positive_boxes
   optim:
-    name: SGD
+    name: "SGD"
     lr: 0.001
     momentum: 0.9
     weight_decay: 0.0005

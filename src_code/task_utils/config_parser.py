@@ -36,6 +36,7 @@ class ConfigParser:
 
         # model configs
         model_configs = self.config_dict.get("model_configs")
+        self.model_name = model_configs.get("name")
         if model_configs is None:
             raise KeyError("model_configs is missing from the config file!")
         self.model_configs = model_configs  
@@ -64,6 +65,7 @@ class ConfigParser:
         # task_configs
         task_configs = self.config_dict.get("task_configs")
         self.debug = task_configs.get("debug")
+        self.log_expt = task_configs.get("log_expt")
         self.num_classes = task_configs.get("num_classes")
         self.img_height = task_configs.get("img_height")
         self.img_width = task_configs.get("img_width")
@@ -72,7 +74,6 @@ class ConfigParser:
     def update(self, additional_config: dict):
         msg = "only linear dict extension support"
         for key, val in additional_config.items():
-            print(key, val)
             assert not isinstance(val, dict), msg
             setattr(self, key, val)
 

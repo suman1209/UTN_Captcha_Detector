@@ -1,3 +1,4 @@
+import math
 import time
 import random
 from abc import ABC, abstractmethod
@@ -30,6 +31,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path as p
 from datetime import datetime
 import yaml
+from pathlib import Path as p
 
 class Metrics(object):
     def __init__(self):
@@ -171,37 +173,42 @@ class CaptchaTrainer:
                 all_labels_gt.extend(labels) 
                 all_difficulties_gt = [torch.zeros_like(i, dtype=torch.bool) for i in all_labels_gt]        
         APs, mAP = utils_mnist_ssd.calculate_mAP(all_boxes_output, all_labels_output, all_scores_output, all_boxes_gt, all_labels_gt, all_difficulties_gt)
-        print(f"{APs = }, {mAP = }")
-        self.logger.log({'mAP': mAP})
+        if self.config.debug:
+            print(f"{APs = }")
+        print(f"{mAP = }")
+        if self.config.log_expt:
+            self.logger.log({'mAP': mAP})
         predicted_captcha = "".join([category_id_labels[i.item()] for i in all_labels_output[random_image]])
-        with torch.no_grad():
-            for i, (images, boxes, labels) in enumerate(self.val_loader):
-                images = images.to(self.config.device)
-                loc_pred, cls_pred, fm_info = self.model(images)
-                loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
-                if debug_info == {}:
+        if self.config.log_expt:
+            with torch.no_grad():
+                for i, (images, boxes, labels) in enumerate(self.val_loader):
+                    images = images.to(self.config.device)
+                    loc_pred, cls_pred, fm_info = self.model(images)
+                    loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
+                    if debug_info == {}:
+                        break
+                    str_labels = ["".join([category_id_labels[i.item()] for i in label]) for label in labels]
+                    if not only_once:
+
+                        img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
+                        label = str_labels[random_image]
+                        gt_boxes = boxes[random_image].cpu().numpy()
+
+                        matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
+                        # to draw all the positive boxes that have been matched
+                        # matched_boxes = debug_info["pos_default_boxes"][random_image].cpu().numpy()
+                        neg_boxes = None
+                        # neg_boxes = debug_info["hardneg_default_boxes"][random_image].cpu().numpy()
+                        pb = len(matched_boxes)
+                        self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, f"epoch={epoch} label = {label} num_pos_boxes={pb} {predicted_captcha = }", i)
+                        logits = debug_info["soft_maxed_pred"][random_image]
+                        GT_int = labels[random_image].tolist()
+                        GT_str = str_labels[random_image]
+                        my_table = wandb.Table(columns=["GT"] + list(category_id_labels.values()) + ["bg"], data=[[f"{GT_str[i]}-{GT_int[i]}"] + logit.tolist() for i, logit in enumerate(logits)])
+                        # self.logger.log({f"logits outputed: {epoch = }": my_table})
+                        
+                        self.log_logits(my_table, epoch)
                     break
-                str_labels = ["".join([category_id_labels[i.item()] for i in label]) for label in labels]
-                if not only_once:
-
-                    img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
-                    label = str_labels[random_image]
-                    gt_boxes = boxes[random_image].cpu().numpy()
-
-                    matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
-                    # to draw all the positive boxes that have been matched
-                    # matched_boxes = debug_info["pos_default_boxes"][random_image].cpu().numpy()
-                    neg_boxes = None
-                    # neg_boxes = debug_info["hardneg_default_boxes"][random_image].cpu().numpy()
-                    pb = len(matched_boxes)
-                    self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, f"epoch={epoch} label = {label} num_pos_boxes={pb} {predicted_captcha = }", i)
-                    logits = debug_info["soft_maxed_pred"][random_image]
-                    GT_int = labels[random_image].tolist()
-                    GT_str = str_labels[random_image]
-                    my_table = wandb.Table(columns=["GT"] + list(category_id_labels.values()) + ["bg"], data=[[f"{GT_str[i]}-{GT_int[i]}"] + logit.tolist() for i, logit in enumerate(logits)])
-                    # self.logger.log({f"logits outputed: {epoch = }": my_table})
-                    self.log_logits(my_table, epoch)
-                break
 
     def log_logits(self, my_table, epoch):
         """this code was generated using deepseek with the following prompt: 
@@ -243,29 +250,38 @@ class CaptchaTrainer:
         plt.tight_layout(rect=[0, 0, 1, 0.96])  # Leave space for the suptitle
 
         # Log the figure to wandb
+        
         self.logger.log({f"Bar Plots {epoch = }": wandb.Image(fig)})
 
         # Close the figure to free up memory
         plt.close(fig)
+        
     def save_checkpoint(self, epoch, filename="model_checkpoint.pth"):
         """Saves model checkpoint."""
+        # Create output folder
+        result_folder = p.cwd()/'docs_and_results'
+        current_time = datetime.now().strftime("%m-%d__%H-%M-%S")
+        # current_time = '09-09__03-52-38'
+        output_folder = utils_mnist_ssd.folder(result_folder/current_time)
         checkpoint = {
             "epoch": epoch,
             "model_state": self.model.state_dict(),
             "optimizer_state": self.optim.state_dict(),
             "config": self.config
         }
-        save_path = os.path.join(self.checkpoint_path, filename)
+        save_path = os.path.join(output_folder, filename)
         torch.save(checkpoint, save_path)
-        # print(f"Checkpoint saved at {save_path}")
+        time.sleep(3)
+        print(f"Checkpoint saved at {save_path}")
 
     def load_checkpoint(self, filename="model_checkpoint.pth"):
         """Loads model checkpoint if available."""
         # Ensure the filename is a correct absolute path
+        assert self.config.checkpoint is not None, "Please specify the checkpoint in the configs!"
         if not os.path.isabs(filename):  
             load_path = filename
         else:
-            load_path = os.path.join("checkpoints", filename) 
+            load_path = os.path.join(self.config.checkpoint, filename) 
 
         if os.path.exists(load_path):
             checkpoint = torch.load(load_path, map_location=self.config.device)
@@ -285,8 +301,11 @@ class CaptchaTrainer:
         loc_losses = []
         ce_pos_losses = []
         ce_neg_losses = []
-
-        for epoch in range(self.start_epoch, self.config.epochs):
+        # save every 10% progress
+        percent = 10
+        save_range = range(0, self.config.epochs, math.ceil(self.config.epochs/percent))
+        save_epoch_list = list(save_range)
+        for epoch in tqdm(range(self.start_epoch, self.config.epochs), desc=f"Training {self.config.model_name}", unit="iteration"):
             loss, ce_loss, loc_loss, ce_pos_loss, ce_neg_loss = self.train_step(epoch)
 
             # Store epoch-wise losses
@@ -296,15 +315,16 @@ class CaptchaTrainer:
             ce_pos_losses.append(ce_pos_loss.avg)
             ce_neg_losses.append(ce_neg_loss.avg)
 
-            # Save checkpoint at every epoch
-            # self.save_checkpoint(epoch)
+            # Save checkpoint
+            if epoch in save_epoch_list:
+                self.save_checkpoint(epoch)
             
             # Run validation (if applicable)
             self.validation_step(epoch)
 
             if scheduler is not None:
-                scheduler.step(epoch)
-                # print(f"{scheduler.get_last_lr() = }")
+                scheduler.step()
+                print(f"{scheduler.get_last_lr() = }")
 
         # Plot the loss curves after training
         # self.plot_loss_curves(ce_losses, loc_losses, ce_pos_losses, ce_neg_losses)
@@ -412,11 +432,6 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
                     norm=nn.BatchNorm2d, act_fn=nn.ReLU(), spectral=False)
         base_size = pretty_print_module_list(base_conv.module_list, torch.zeros([1,3,configs.base_conv_input_size, configs.base_conv_input_size]))
         # Create output folder
-        result_folder = p.cwd()/'results'
-        current_time = datetime.now().strftime("%m-%d__%H-%M-%S")
-        # current_time = '09-09__03-52-38'
-        output_folder = utils_mnist_ssd.folder(result_folder/current_time)
-        print(type(output_folder))
 
         aux_conv = AuxConv(configs.aux_conv_conv_layers, 
                         configs.aux_conv_input_size, norm=nn.BatchNorm2d, act_fn=nn.ReLU(), spectral=False)
@@ -448,62 +463,7 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
                                     lr=configs.lr, weight_decay=configs.weight_decay)
         # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, configs.multistep_milestones, gamma=configs.multistep_gamma, verbose=False)
         loss_fn = MultiBoxLossSSD(priors_cxcy=model.priors_cxcy, configs=configs)
-        # loss_fn = MultiBoxLoss(default_boxes=model.priors_cxcy, config=configs)
-        # plot_loss = []
-
-        #load checkpoint
-        # if configs.checkpoint:
-        #     print('Loaded checkpoint')
-        #     checkpoint = torch.load(configs.checkpoint, map_location=configs.device)
-        #     model.load_state_dict(checkpoint['model_state_dict'])
-        #     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        #     scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-        #     plot_loss = checkpoint['plot_loss']
-        #     print("### Evaluating Model ###")
-        #     # @todo dhimitri add your evaluation files here
-        # training_progress_bar = tqdm(range(configs.epochs))
-        # epoch_progress_bar = tqdm(range(len(train_loader)))
-
-        # for e in range(configs.epochs):
-        #     training_progress_bar.update()
-        #     epoch_progress_bar.reset()
-
-        #     mean_loss = 0
-        #     for img, boxes, labels in train_loader:
-        #         epoch_progress_bar.update()
-        #         # img: tensor [n, c=1, h, w]
-        #         # boxes: list[n] of tensor[n_object, 4]
-        #         # labels: list[n] of tensor[n_object]
-        #         loc_output, cla_output, _ = model(img.to(configs.device))
-        #         boxes = [bb.to(configs.device) for bb in boxes]
-        #         labels = [ll.to(configs.device) for ll in labels]
-        #         loss = criterion(loc_output.to(configs.device), cla_output.to(configs.device), boxes, labels)
-        #         if configs.debug:
-        #             wandb.log({"train_loss_per_batch": loss.item()})
-        #         optimizer.zero_grad()
-        #         loss.backward()
-        #         if configs.clip_grad is not None:
-        #             utils_mnist_ssd.clip_gradient(optimizer, configs.clip_grad)
-                
-        #         optimizer.step()
-        #         mean_loss += loss.item()
-        #         # break
-        #     scheduler.step()
-        #     mean_loss /= len(train_loader)
-        #     plot_loss.append(mean_loss)
         
-        # if (e%configs.print_frequency == configs.print_frequency - 1) or (e==0):
-        #     print(mean_loss)
-        #     print(criterion.loc_loss.item(), criterion.cla_loss.item())
-
-        # if e % configs.save_frequency == configs.save_frequency - 1:
-        #     utils_mnist_ssd.plot_loss(plot_loss, output_folder/'train_loss.png')
-        #     utils_mnist_ssd.plot_loss(plot_loss[-5:], output_folder/'train_loss_tail.png')
-        #     torch.save({'model_state_dict': model.state_dict(), 
-        #                 'optimizer_state_dict': optimizer.state_dict(),
-        #                 'scheduler_state_dict': scheduler.state_dict(),
-        #                 'config': configs,
-        #                 'plot_loss': plot_loss}, output_folder/'checkpoint.pth')
     elif model_name=="ssd_captcha":
         print(configs.base_conv_input_size)
 
@@ -551,17 +511,15 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
         feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
         default_boxes = model.generate_default_boxes()
         loss_fn = MultiBoxLoss(default_boxes=default_boxes, config=configs)
-        if configs.debug:
-            logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
+
     
     else:
         raise Exception(f"Invalid {model_name}!")
 
     # Train
     trainer = CaptchaTrainer(model, train_loader, val_loader, test_loader, loss_fn, optimizer, configs, logger)
-    
-    
-    # train
+    if configs.log_expt:
+        logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
 
     # train
     trainer.fit()
