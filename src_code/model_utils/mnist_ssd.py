@@ -7,19 +7,7 @@ basic_conv = nn.Conv2d #change this to 3d if needed
 from .utils_mnist_ssd import cxcy_to_gcxgcy,  gcxgcy_to_cxcy, class_label
 from .utils import cxcy_to_xy, find_IoU, xy_to_cxcy
 import torch.nn.functional as F
-#generally useful
-class Pad_to_even_size(nn.Module):
-    def __init__(self):
-        super(Pad_to_even_size, self).__init__()
-        
-    def forward(self, x):
-        a = []
-        for i in x.shape[2:]:
-            if i%2 == 1:
-                a = [0,1] + a
-            else:
-                a = [0,0] + a
-        return torch.nn.functional.pad(x, a)
+
 
 def pretty_print_module_list(module_list, x, print_net=False, max_colwidth=500):
     '''x: dummyinput [batch=1, C, H, W]'''
@@ -72,16 +60,12 @@ class BaseConv(nn.Module):
             maxpool, 
             conv(10, 20), norm, act_fn, 
             conv(20, 20), norm, act_fn]
-
-        input_size: int (assume square images)
         '''
         super(BaseConv, self).__init__()
         #create module list
         self.module_list = nn.ModuleList()
         self.fm_id = []
         for i in range(len(conv_layers)-1):
-            if input_size % 2 == 1:
-                self.module_list.append(Pad_to_even_size())
             self.module_list.extend([
                 conv(inC=conv_layers[i], outC=conv_layers[i+1], spectral=spectral),
                 norm(conv_layers[i+1]),
@@ -91,7 +75,7 @@ class BaseConv(nn.Module):
                 act_fn, 
                 nn.MaxPool2d(kernel_size=2)]
             )
-            input_size = np.ceil(input_size / 2)
+            input_size = np.ceil(np.array(input_size) / 2)
 
             #select feature maps for prediction. They are the output of act_fn right before maxpool layers
             self.fm_id.append(len(self.module_list) - 2)
@@ -101,7 +85,6 @@ class BaseConv(nn.Module):
         self.module_list = self.module_list[:-1] #ignore last maxpool layer
 
         self.output_size = input_size
-
     def forward(self, x):
         fm = []
         for i in range(len(self.module_list)):
@@ -122,7 +105,7 @@ class AuxConv(nn.Module):
             conv(c2, c2//2), norm, act_fn, 
             conv(c2//2, c3), norm, act_fn]
 
-        input_size: int (assume square images)
+        input_size: int
         '''
         super(AuxConv, self).__init__()
         self.module_list = nn.ModuleList()
@@ -235,20 +218,24 @@ class SSD(nn.Module):
         '''
         priors = []
         for i in range(self.configs.n_fm):
-            d = self.configs.fm_size[i]
+            d_h = self.configs.fm_size[i][0]
+            d_w = self.configs.fm_size[i][1]
             s = self.configs.fm_prior_scale[i]
-            for j in range(d):
-                for k in range(d):
+            h_w_ratio = d_h / d_w
+            
+            for j in range(d_w):
+                for k in range(d_h):
                     #Note the order of k, j vs x,y here. It must be consistent with the permute/view operation in PredictionConv.post_process_output
-                    cx = (k + 0.5)/d
-                    cy = (j + 0.5)/d
+                    cx = (j + 0.5)/d_w
+                    cy = (k + 0.5)/d_h
                     for r in self.configs.fm_prior_aspect_ratio[i]:
-                        priors.append([cx, cy, s*np.sqrt(r), s/np.sqrt(r)])
+                        w_scale = s * h_w_ratio
+                        w_scale = (1/r) * w_scale
+                        assert w_scale <=1, f"{w_scale = }"
+                        assert s <=1, f"{w_scale = }"
+                        priors.append([cx, cy, w_scale, s])
                         if r==1:
-                            try:
-                                additional_scale = np.sqrt(s*self.configs.fm_prior_scale[i+1])
-                            except IndexError:
-                                additional_scale = 1.
+                            additional_scale = 0.1
                             priors.append([cx, cy, additional_scale, additional_scale])
         priors = torch.FloatTensor(priors).to(self.configs.device)
         priors.clamp_(0, 1)

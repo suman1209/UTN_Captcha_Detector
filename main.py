@@ -4,7 +4,7 @@ import wandb
 from src_code.data_utils.dataset_utils import get_dataloader
 from src_code.data_utils.dataset_utils import CaptchaDataset
 from src_code.model_utils.train_utils import trainer
-from src_code.data_utils.preprocessing import get_img_transform
+from src_code.data_utils.preprocessing import get_img_transform, get_rectangle_img_transform
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,7 +24,9 @@ def main(config_path: str | Path | None = None) -> None:
         default_model_configs = yaml.safe_load(file)
     assert isinstance(default_model_configs, dict)
     configs.update(default_model_configs)
-    setattr(configs, "base_conv_input_size", configs.img_height)
+    new_h = configs.img_height // configs.downscale_factor
+    new_w = configs.img_width // configs.downscale_factor
+    setattr(configs, "base_conv_input_size", [new_h, new_w])
     logger = None
 
     if configs.log_expt:
@@ -46,15 +48,15 @@ def main(config_path: str | Path | None = None) -> None:
         configs.train_labels_dir,
         augment=True,
         config=configs,
-        img_transform=get_img_transform(configs)
+        img_transform=get_rectangle_img_transform(configs)
     )
-
+    
     val_dataset = CaptchaDataset(
         configs.val_preprocessed_dir,
         configs.val_labels_dir,
         augment=False,
         config=configs,
-        img_transform=get_img_transform(configs)
+        img_transform=get_rectangle_img_transform(configs)
     )
 
     test_dataset = CaptchaDataset(
@@ -62,7 +64,7 @@ def main(config_path: str | Path | None = None) -> None:
         labels_dir=None,
         augment=False,
         config=configs,
-        img_transform=get_img_transform(configs)
+        img_transform=get_rectangle_img_transform(configs)
     )
 
     # Create data loaders

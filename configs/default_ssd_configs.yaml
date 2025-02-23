@@ -1,5 +1,4 @@
-base_conv_conv_layers: [3, 16, 32, 64]
-base_conv_input_size: 75
+base_conv_conv_layers: [1, 16, 32, 64]
 aux_conv_conv_layers: [64, 64, 64]
 aux_conv_input_size: 8
 fm_prior_aspect_ratio: [[1., 2., 3., 0.3, 0.5],
