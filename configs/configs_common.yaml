@@ -19,6 +19,7 @@ data_configs:
     scale_range: (0.8, 1.2)
     zoom_prob: 0.3
     saturation_prob: 0
+    rotation_prob: 0.3
 
 model_configs:
   checkpoint: null # Training from Scratch

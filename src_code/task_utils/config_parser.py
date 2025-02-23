@@ -33,6 +33,7 @@ class ConfigParser:
         self.scale_range = aug_config.get("scale_range")
         self.zoom_prob = aug_config.get("zoom_prob")
         self.saturation_prob = aug_config.get("saturation_prob")
+        self.rotation_prob = aug_config.get("rotation_prob")
 
         # model configs
         model_configs = self.config_dict.get("model_configs")
