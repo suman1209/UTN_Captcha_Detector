@@ -173,7 +173,6 @@ class CaptchaTrainer:
         APs, mAP = utils_mnist_ssd.calculate_mAP(all_boxes_output, all_labels_output, all_scores_output, all_boxes_gt, all_labels_gt, all_difficulties_gt)
         print(f"{APs = }, {mAP = }")
         self.logger.log({'mAP': mAP})
-        breakpoint()
         predicted_captcha = "".join([category_id_labels[i.item()] for i in all_labels_output[random_image]])
         with torch.no_grad():
             for i, (images, boxes, labels) in enumerate(self.val_loader):

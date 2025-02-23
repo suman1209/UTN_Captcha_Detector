@@ -1,0 +1,59 @@
+data_configs:
+  train_path: "datasets/utn_dataset/part2/train"
+  val_path: "datasets/utn_dataset/part2/val"
+  test_path: "datasets/utn_dataset/part2/test"
+  preprocessing_related:
+    mean: 0.5 # for raw_image normalisation
+    std: 0.5 # for raw_image normalisation
+    downscale_factor: 4
+  dataset_related:
+    train_preprocessed_dir: "./datasets/utn_dataset/part2/train/images"
+    val_preprocessed_dir: "./datasets/utn_dataset/part2/val/images"
+    test_preprocessed_dir: "./datasets/utn_dataset/part2/test/images"
+    train_labels_dir: "./datasets/utn_dataset/part2/train/labels"
+    val_labels_dir: "./datasets/utn_dataset/part2/val/labels"
+    augment: True
+    shuffle: False
+  augmentation_related:
+    flip_prob: 0.5
+    scale_range: (0.8, 1.2)
+    zoom_prob: 0.3
+    saturation_prob: 0
+
+model_configs:
+  checkpoint: null # Training from Scratch
+  # checkpoint: "checkpoints/model_checkpoint.pth"  # Resume training from last saved epoch
+  print_freq: 500
+  epochs: 100
+  batch_size: 32
+  device: "cuda" # either "cpu" or "cuda"
+  backbone:
+    name: VGG16
+    num_stages: 6
+  loss:
+    alpha: 0.25 # loss = alpha*loc_loss + cls_loss
+    pos_box_threshold: 0.5 # a default box is marked positive if it has (> pos_box_threshold) IoU score with any of the groundtruth boxes
+    hard_neg_pos: 3 # num of negative boxes = hard_neg_pos * num_positive_boxes
+  optim:
+    name: SGD
+    lr: 0.001
+    momentum: 0.9
+    weight_decay: 0.0005
+    clip_grad: null
+  scheduler:
+    name: "LinearLR" # 'MultiStepLR' or 'LinearLR'
+    # only for MultiStepLR
+    milestones: [10, 20] # lr reduction whenever training hits the given epoch milestone
+    gamma: 0.1 # the factor by which the learning rate decreases
+    # only for LinearLR
+    start_factor: 0.5 # lr multiplicative factor increases from (start_factor to 1) in total_iter steps
+    total_iter: 4
+
+task_configs:
+  img_height: 75 # original image height
+  img_width: 75 # original image width
+  debug: True # if True will display a lot of intermediate information for debugging purposes
+  log_expt: False # whether to log the experiment online or not
+  num_classes: 37 # A-Z(26), 0-9(10), background(1)
+  min_cls_score: 0.01 # if the cls score for a bounding box is less than this, it is considered as background
+  nms_iou_score: 0.1 # if the iou between two bounding boxes is less than this, it is suppressed
