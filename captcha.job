@@ -1,9 +1,9 @@
 #!/bin/bash -l
 #SBATCH --job-name=captcha          # Name of Job
 #SBATCH --output=results_%A.out     # File where outputs/errors will be saved
-#SBATCH --time=00:59:00             # Time limit (hh:mm:ss)
+#SBATCH --time=03:59:00             # Time limit (hh:mm:ss)
 #SBATCH --ntasks=1                  # Number of tasks
-#SBATCH --gres=gpu:a40:1            # Request 1 GPU
+#SBATCH --gres=gpu:a100:1            # Request 1 GPU
 #SBATCH --nodes=1                   # Request 1 node
 
 module purge
@@ -11,6 +11,6 @@ module load python # load preinstalled python module (includes conda)
 conda activate captcha_env # activate environment
 conda env update --file environment.yml  --prune # update environment if required
 python -c "import torch; print('cuda available:', torch.cuda.is_available())"
-
+print("starting the program!")
 # run the main program
-python main.py
+python main_copy.py configs/configs_common_full.yaml
