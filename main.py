@@ -4,7 +4,7 @@ import wandb
 from src_code.data_utils.dataset_utils import get_dataloader
 from src_code.data_utils.dataset_utils import CaptchaDataset
 from src_code.model_utils.train_utils import trainer
-
+from src_code.data_utils.preprocessing import get_img_transform
 
 def main(config_path: str | Path | None = None) -> None:
     # all the parameters can be obtained from this configs object
@@ -28,21 +28,24 @@ def main(config_path: str | Path | None = None) -> None:
         configs.train_preprocessed_dir,
         configs.train_labels_dir,
         augment=True,
-        config=configs
+        config=configs,
+        img_transform=get_img_transform()
     )
 
     val_dataset = CaptchaDataset(
         configs.val_preprocessed_dir,
         configs.val_labels_dir,
         augment=False,
-        config=configs
+        config=configs,
+        img_transform=get_img_transform()
     )
 
     test_dataset = CaptchaDataset(
         configs.test_preprocessed_dir,
         labels_dir=None,
         augment=False,
-        config=configs
+        config=configs,
+        img_transform=get_img_transform()
     )
 
     # Create data loaders
@@ -54,7 +57,7 @@ def main(config_path: str | Path | None = None) -> None:
     print(f"Train Dataloader has {len(train_loader.dataset)} images")
     print(f"Validation Dataloader has {len(val_loader.dataset)} images")
     print(f"Test Dataloader has {len(test_loader.dataset)} images")
-
+    
     print("### Training Model ###")
     trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, logger=logger)
     

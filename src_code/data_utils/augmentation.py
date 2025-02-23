@@ -71,7 +71,6 @@ class Augmentations:
         # print(zoom_factor)
 
         _, height, width = image.shape
-
         # Crop size in absolute pixels
         crop_height = int(height / zoom_factor)
         crop_width = int(width / zoom_factor)

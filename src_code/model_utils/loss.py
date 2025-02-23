@@ -79,7 +79,8 @@ class MultiBoxLoss(nn.Module):
         scaled_default_boxes = self.db.to(dev)# * img_scale / self.ds_factor
         default_boxes_xy = cxcy_to_xy(scaled_default_boxes)
         loss = -1
-        debug_info["soft_maxed_pred"] = []
+        if self.debug:
+            debug_info["soft_maxed_pred"] = []
         """
         populate the ground-truth loc offsets and labels
         for each default boxes in eahc image of the batch

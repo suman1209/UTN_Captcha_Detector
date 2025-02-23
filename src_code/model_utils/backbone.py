@@ -13,7 +13,7 @@ class VGG16Backbone(nn.Module):
         super(VGG16Backbone, self).__init__()
         self.pretrained = pretrained
         # Standard convolutional layers in VGG16
-        self.conv1_1 = nn.Conv2d(1, 64, kernel_size=3, padding=1)  # stride = 1, by default
+        self.conv1_1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)  # stride = 1, by default
         self.conv1_2 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
@@ -40,7 +40,7 @@ class VGG16Backbone(nn.Module):
         self.conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6)  # atrous convolution
 
         self.conv7 = nn.Conv2d(1024, 1024, kernel_size=1)
-
+        
         # Load pretrained layers
         if self.pretrained:
             self.load_pretrained_layers()
@@ -70,6 +70,7 @@ class VGG16Backbone(nn.Module):
         out = F.relu(self.conv4_2(out))  # (N, 512, 38, 38)
         out = F.relu(self.conv4_3(out))  # (N, 512, 38, 38)
         conv4_3_feats = out  # (N, 512, 38, 38)
+        # print(f"{conv4_3_feats.shape = }")
         out = self.pool4(out)  # (N, 512, 19, 19)
 
         out = F.relu(self.conv5_1(out))  # (N, 512, 19, 19)
@@ -79,11 +80,11 @@ class VGG16Backbone(nn.Module):
 
         out = F.relu(self.conv6(out))  # (N, 1024, 19, 19)
 
-        # conv7_feats = F.relu(self.conv7(out))  # (N, 1024, 19, 19)
-
+        conv7_feats = F.relu(self.conv7(out))  # (N, 1024, 19, 19)
+        # print(f"{conv7_feats.shape = }")
         # Lower-level feature maps
         # if self.pretrained:
-        return out, conv2_2_feats, conv3_3_feats
+        return out, conv4_3_feats, conv7_feats
 
     def load_pretrained_layers(self):
         """

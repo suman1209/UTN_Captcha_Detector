@@ -36,6 +36,18 @@ def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
     ])
     return transform(image)
 
+def get_img_transform():
+     transform = transforms.Compose([
+        transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
+        transforms.Normalize(mean = [0.4429, 0.5330, 0.4279], std = [0.0841, 0.0718, 0.0796])
+        # transforms.Resize((300, 300)) # Normalize to range [-1, 1]
+    ])
+    # transform = transforms.Compose([
+    #     transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
+    # ])
+     return transform
+
+
 def preprocess_bounding_boxes(bbox, downscale_factor=None):
     """
     Adjust bounding box coordinates if a downscale factor is provided.

@@ -2,6 +2,8 @@ import torch
 import os
 from torchvision.datasets import VisionDataset
 from .augmentation import Augmentations
+from .preprocessing import get_img_transform
+from PIL import Image
 
 category_id_labels = {
     0: "0",
@@ -48,7 +50,7 @@ label_map['background'] = 36
 
 
 class CaptchaDataset(VisionDataset):
-    def __init__(self, preprocessed_dir, labels_dir=None, augment=True, config=None):
+    def __init__(self, preprocessed_dir, labels_dir=None, augment=True, config=None, img_transform=None):
         """
         Captcha Dataset for loading preprocessed data
 
@@ -62,15 +64,15 @@ class CaptchaDataset(VisionDataset):
         self.augment = augment
         self.augmentations = Augmentations(config) if augment else None
 
-        self.image_names = sorted([f for f in os.listdir(preprocessed_dir) if f.endswith(".pt")])
-
+        self.image_names = sorted([f for f in os.listdir(preprocessed_dir) if f.endswith((".pt", ".png"))])
+        self.img_transform = img_transform
+        
     def load_labels(self, image_name):
         """
         Loading bounding boxes and class labels
         """
 
-        label_file = os.path.join(self.labels_dir, image_name.replace(".pt",
-                                                                      ".txt"))
+        label_file = os.path.join(self.labels_dir, image_name.replace(".png", ".txt"))
 
         if not os.path.exists(label_file):
             raise FileNotFoundError(f"Label file not found: {label_file}")
@@ -106,8 +108,11 @@ class CaptchaDataset(VisionDataset):
             raise FileNotFoundError(f"Preprocessed file not found: {preprocessed_path}")
 
         # Load image tensor
-        image = torch.load(preprocessed_path)
+        image = Image.open(preprocessed_path).convert("RGB")  # Convert RGBA to RGB
 
+        if self.img_transform is not None:
+            image = self.img_transform(image)
+            
         # Load bounding boxes and labels
         if self.labels_dir:
             orig_bboxes, labels = self.load_labels(img_name)

@@ -328,7 +328,7 @@ class CaptchaTrainer:
     def plot_bb(self, img_np, gt_boxes, matched_boxes, neg_boxes, epoch, i):
         # Image with bounding boxes
         fig, ax = plt.subplots(1, figsize=(8, 4))
-        ax.imshow(img_np, cmap="gray")
+        ax.imshow(img_np)
 
         img_height, img_width, _ = img_np.shape
 
@@ -409,12 +409,13 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
                                 lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
         
     # # a dummy forward method to calculate the default boxes
-    # test_input = torch.randn(1, 1, 40, 160)  # Maintain rectangular aspect ratio
-    # pred_locs, pred_cls, fm_info = model(test_input)
-    # feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
+    test_input = torch.randn(1, 3, 160, 640)  # Maintain rectangular aspect ratio
+    pred_locs, pred_cls, fm_info = model(test_input)
+    feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
     default_boxes = model.generate_default_boxes()
     loss_fn = MultiBoxLoss(default_boxes=default_boxes, config=configs)
-    logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
+    if configs.debug:
+        logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
     trainer = CaptchaTrainer(model, train_loader, val_loader, test_loader, loss_fn, optimizer, configs, logger)
     
     # train
