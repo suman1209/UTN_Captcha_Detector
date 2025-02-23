@@ -59,6 +59,7 @@ class ConfigParser:
         self.lr = optim_configs.get("lr")
         self.momentum = optim_configs.get("momentum")
         self.weight_decay = optim_configs.get("weight_decay")
+        self.clip_grad = optim_configs.get("clip_grad")
         
         # task_configs
         task_configs = self.config_dict.get("task_configs")
@@ -67,6 +68,13 @@ class ConfigParser:
         self.img_height = task_configs.get("img_height")
         self.img_width = task_configs.get("img_width")
         return self
+
+    def update(self, additional_config: dict):
+        msg = "only linear dict extension support"
+        for key, val in additional_config.items():
+            print(key, val)
+            assert not isinstance(val, dict), msg
+            setattr(self, key, val)
 
     def __verify__argparse(self, config_path):
 

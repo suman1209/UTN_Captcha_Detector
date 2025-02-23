@@ -5,6 +5,8 @@ from .augmentation import Augmentations
 from .preprocessing import get_img_transform
 from PIL import Image
 
+import copy
+
 category_id_labels = {
     0: "0",
     1: "1",
@@ -158,3 +160,38 @@ def collate_fn(batch):
     else:
         images = torch.stack(batch, dim=0)
         return images
+
+def plot_image_with_bboxes(image, bboxes_orig, labels, title="Image with Bounding Boxes"):
+    img_height, img_width = image.shape[1], image.shape[2] 
+    print(img_height, img_width)
+    # Scale normalized bboxes to absolute pixel values for visualization
+    # TODO: --> * 4 used for non flipped images: works
+    # Issue with flipped ones
+    # How to test: set flip prob to one and you will see :)
+    # bboxes = bboxes_orig.copy()
+    bboxes = copy.deepcopy(bboxes_orig)
+    bboxes[:, [0, 2]] *= img_width
+    bboxes[:, [1, 3]] *= img_height
+
+    # Convert to integer values for plotting
+    bboxes_abs = bboxes.to(torch.int)
+    
+    print("BBoxes for Visualization:", bboxes_abs)
+
+    # Ensure labels are strings
+    if isinstance(labels, torch.Tensor):
+        labels = labels.tolist()
+    labels = [str(l) for l in labels]
+
+    # TODO: Image to RGB
+
+    # Draw bboxes
+    image_with_boxes = draw_bounding_boxes(image, bboxes_abs, labels=labels, colors="red", width=2)
+
+    # image tensor to NumPy for visualization
+    img = image_with_boxes.permute(1, 2, 0).numpy()
+
+    plt.imshow(img)
+    plt.axis("off")
+    plt.title(title)
+    plt.show()

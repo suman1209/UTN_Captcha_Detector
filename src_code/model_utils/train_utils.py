@@ -19,7 +19,17 @@ import os
 os.environ['WANDB_CACHE_DIR'] = "./"
 os.environ['WANDB_DATA_DIR'] = "./"
 import numpy as np
-
+from src_code.model_utils import utils_mnist_ssd
+from src_code.model_utils.mnist_ssd import SSD, BaseConv, pretty_print_module_list, AuxConv, MultiBoxLossSSD
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+from tqdm import tqdm 
+import matplotlib.pyplot as plt
+from pathlib import Path as p
+from datetime import datetime
+import yaml
 
 class Metrics(object):
     def __init__(self):
@@ -75,7 +85,7 @@ class CaptchaTrainer:
         ce_pos_losses = Metrics()
         ce_neg_losses = Metrics()
         assert len(self.train_loader) > 0, f"{len(self.train_loader) = }"
-
+        num_batches = len(self.train_loader)
         for i, (images, boxes, labels) in enumerate(self.train_loader):
             images = images.to(self.config.device)  # (batch_size (N), 3, 160, 640)
             images.requires_grad=True
@@ -84,7 +94,10 @@ class CaptchaTrainer:
             loc_pred, cls_pred, fm_info = self.model(images)
             # loss
             loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
+            # Backward pass
+            loss.backward()
 
+            self.optim.step()
             
             # Extract and detach loss components
             ce_loss = debug_info.get('ce_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
@@ -93,10 +106,7 @@ class CaptchaTrainer:
             ce_neg_loss = debug_info.get('ce_hard_neg_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
             loss_value = loss.detach().cpu().item()
 
-            # Backward pass
-            loss.backward()
 
-            self.optim.step()
 
             # Update metrics
             losses.update(loss_value, images.size(0))
@@ -123,13 +133,9 @@ class CaptchaTrainer:
                 # avail_mem = avail_mem / 1e9
                 # self.logger.log({"gpu_free_mem": free_mem})
     
-            # losses.update(loss.item(), images.size(0))
-            # ce_losses.update(debug_info['ce_loss'], images.size(0))
-            # loc_losses.update(debug_info['loc_loss'], images.size(0))
-            # ce_pos_losses.update(debug_info['ce_pos_loss'], images.size(0))
-            # ce_neg_losses.update(debug_info['ce_hard_neg_loss'], images.size(0))
+            
             if i % self.config.print_freq == 0:
-                print(f"Epoch: {epoch} | Loss: {losses.avg:.4f} | CE Loss: {ce_losses.avg:.4f} | "
+                print(f"Epoch: {epoch}({i}/{num_batches}) | Loss: {losses.avg:.4f} | CE Loss: {ce_losses.avg:.4f} | "
                     f"Loc Loss: {loc_losses.avg:.4f} | CE Pos Loss: {ce_pos_losses.avg:.4f} | "
                     f"CE Neg Loss: {ce_neg_losses.avg:.4f}")
                 
@@ -138,28 +144,58 @@ class CaptchaTrainer:
         return losses, ce_losses, loc_losses, ce_pos_losses, ce_neg_losses
 
     def validation_step(self, epoch):
+        # rand image and draw the ground truth bbox and the matched default box
+        random_image = random.randint(0, self.config.batch_size - 1)
         self.model.eval()
         self.model.to(self.config.device)
         only_once = False
+        all_boxes_output = []
+        all_labels_output = []
+        all_scores_output = []
+        all_boxes_gt = []
+        all_labels_gt = []
+        all_difficulties_gt = []
+
+        self.model.eval()
+        with torch.no_grad():
+            for images, boxes, labels in tqdm(self.val_loader): #labels: list[n] of tensors[n_object]
+
+                loc_output, cla_output, _ =  self.model(images.to(self.config.device)) #loc_output: tensor[n,n_p,4], cla_output: tensor[n, n_p, n_classes]
+                boxes_output, labels_output, scores_output =  self.model.detect_object(loc_output, cla_output, min_score=0.2, max_overlap=0.45, top_k=32)
+                
+                all_boxes_output.extend(boxes_output)
+                all_labels_output.extend(labels_output)
+                all_scores_output.extend(scores_output)
+                
+                all_boxes_gt.extend(boxes)
+                all_labels_gt.extend(labels) 
+                all_difficulties_gt = [torch.zeros_like(i, dtype=torch.bool) for i in all_labels_gt]        
+        APs, mAP = utils_mnist_ssd.calculate_mAP(all_boxes_output, all_labels_output, all_scores_output, all_boxes_gt, all_labels_gt, all_difficulties_gt)
+        print(f"{APs = }, {mAP = }")
+        self.logger.log({'mAP': mAP})
+        breakpoint()
+        predicted_captcha = "".join([category_id_labels[i.item()] for i in all_labels_output[random_image]])
         with torch.no_grad():
             for i, (images, boxes, labels) in enumerate(self.val_loader):
-                images = images.to(self.config.device) 
+                images = images.to(self.config.device)
                 loc_pred, cls_pred, fm_info = self.model(images)
                 loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
+                if debug_info == {}:
+                    break
                 str_labels = ["".join([category_id_labels[i.item()] for i in label]) for label in labels]
                 if not only_once:
-                    # rand image and draw the ground truth bbox and the matched default box
-                    random_image = 0#random.randint(0, images.shape[0] - 1)
+
                     img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
                     label = str_labels[random_image]
                     gt_boxes = boxes[random_image].cpu().numpy()
 
-                    # matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
+                    matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
                     # to draw all the positive boxes that have been matched
-                    matched_boxes = debug_info["pos_default_boxes"][random_image].cpu().numpy()
-                    neg_boxes = debug_info["hardneg_default_boxes"][random_image].cpu().numpy()
+                    # matched_boxes = debug_info["pos_default_boxes"][random_image].cpu().numpy()
+                    neg_boxes = None
+                    # neg_boxes = debug_info["hardneg_default_boxes"][random_image].cpu().numpy()
                     pb = len(matched_boxes)
-                    self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, f"epoch={epoch} label = {label} num_pos_boxes={pb}", i)
+                    self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, f"epoch={epoch} label = {label} num_pos_boxes={pb} {predicted_captcha = }", i)
                     logits = debug_info["soft_maxed_pred"][random_image]
                     GT_int = labels[random_image].tolist()
                     GT_str = str_labels[random_image]
@@ -342,8 +378,9 @@ class CaptchaTrainer:
         matched_boxes[:, [1, 3]] *= img_height
 
         # Get ground truth boxes and scale to image size
-        neg_boxes[:, [0, 2]] *= img_width
-        neg_boxes[:, [1, 3]] *= img_height
+        if neg_boxes is not None:
+            neg_boxes[:, [0, 2]] *= img_width
+            neg_boxes[:, [1, 3]] *= img_height
         
         # Plot ground truth boxes
         # https://stackoverflow.com/questions/37435369/how-to-draw-a-rectangle-on-image
@@ -357,66 +394,175 @@ class CaptchaTrainer:
             x_min, y_min, x_max, y_max = box
             rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='blue', facecolor='none')
             ax.add_patch(rect)
-        
-        # Plot neg boxes
-        for box in neg_boxes:
-            x_min, y_min, x_max, y_max = box
-            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='red', facecolor='none')
-            ax.add_patch(rect)
+        if neg_boxes is not None:
+            # Plot neg boxes
+            for box in neg_boxes:
+                x_min, y_min, x_max, y_max = box
+                rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='red', facecolor='none')
+                ax.add_patch(rect)
 
         ax.legend()
         ax.set_title(f"Image in epoch: {epoch}, step {i}")
         wandb.log({f"bbox_visual-{epoch =}": wandb.Image(fig)})
         plt.close(fig)
-    
-def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger):
-    model = SSDCaptcha()
-    # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
-    biases = list()
-    not_biases = list()
-    freeze_param_names = [
-    "backbone.conv1_1.weight", "backbone.conv1_1.bias",
-    "backbone.conv1_2.weight", "backbone.conv1_2.bias",
-    "backbone.conv2_1.weight", "backbone.conv2_1.bias",
-    "backbone.conv2_2.weight", "backbone.conv2_2.bias",
-    "backbone.conv3_1.weight", "backbone.conv3_1.bias",
-    "backbone.conv3_2.weight", "backbone.conv3_2.bias",
-    "backbone.conv3_3.weight", "backbone.conv3_3.bias",
-    "backbone.conv4_1.weight", "backbone.conv4_1.bias",
-    "backbone.conv4_2.weight", "backbone.conv4_2.bias",
-    "backbone.conv4_3.weight", "backbone.conv4_3.bias",
-    "backbone.conv5_1.weight", "backbone.conv5_1.bias",
-    "backbone.conv5_2.weight", "backbone.conv5_2.bias",
-    "backbone.conv5_3.weight", "backbone.conv5_3.bias",
-    "backbone.conv6.weight", "backbone.conv6.bias",
-    "backbone.conv7.weight", "backbone.conv7.bias"
-]   
-    freeze_backbone = False
-    if freeze_backbone:
-        freezed_params_groups = 0    
-        for param_name, param in model.named_parameters():
+
+def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger, model_name):
+    if model_name=="ssd_mnist":
+        base_conv = BaseConv(configs.base_conv_conv_layers, 
+                    configs.base_conv_input_size, chosen_fm=[-2, -1],
+                    norm=nn.BatchNorm2d, act_fn=nn.ReLU(), spectral=False)
+        base_size = pretty_print_module_list(base_conv.module_list, torch.zeros([1,3,configs.base_conv_input_size, configs.base_conv_input_size]))
+        # Create output folder
+        result_folder = p.cwd()/'results'
+        current_time = datetime.now().strftime("%m-%d__%H-%M-%S")
+        # current_time = '09-09__03-52-38'
+        output_folder = utils_mnist_ssd.folder(result_folder/current_time)
+        print(type(output_folder))
+
+        aux_conv = AuxConv(configs.aux_conv_conv_layers, 
+                        configs.aux_conv_input_size, norm=nn.BatchNorm2d, act_fn=nn.ReLU(), spectral=False)
+        aux_size = pretty_print_module_list(aux_conv.module_list, torch.zeros(base_size[-1]))
+
+        setattr(configs, 'fm_channels', [base_size[i][1] for i in base_conv.fm_id] + [aux_size[i][1] for i in aux_conv.fm_id])
+        setattr(configs, 'fm_size', [base_size[i][-1] for i in base_conv.fm_id] + [aux_size[i][-1] for i in aux_conv.fm_id])
+        setattr(configs, 'n_fm', len(configs.fm_channels))
+        setattr(configs,'fm_prior_aspect_ratio', configs.fm_prior_aspect_ratio[:configs.n_fm])
+        setattr(configs,'fm_prior_scale', np.linspace(0.1, 0.9, configs.n_fm)) #[0.2, 0.375, 0.55, 0.725, 0.9] # [0.1, 0.2, 0.375, 0.55, 0.725, 0.9] 
+        assert len(configs.fm_prior_scale) == len(configs.fm_prior_aspect_ratio)
+        setattr(configs, 'n_prior_per_pixel', [len(i)+1 for i in configs.fm_prior_aspect_ratio]) #in fm1, each pixel has 4 priors
+        setattr(configs, 'multistep_milestones', list(range(10, configs.epochs, 5)))
+
+
+        utils_mnist_ssd.img_size = base_size[0][-1]
+        model = SSD(configs, base_conv, aux_conv).to(configs.device)
+        # create optimizer, scheduler, criterion, then load checkpoint if specified
+        bias = []
+        not_bias = []
+        for name, param in model.named_parameters():
             if param.requires_grad:
-                if param_name.endswith('.bias'):
-                    biases.append(param)
+                if 'bias' in name:
+                    bias.append(param)
                 else:
-                    not_biases.append(param)
-            if param_name  in freeze_param_names:
-                freezed_params_groups += 1
-                print(f"freezing: {param_name}")
-                param.requires_grad = False
-        print(f"freezed total of : {freezed_params_groups} groups")
-    optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * configs.lr}, {'params': not_biases}],
-                                lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
+                    not_bias.append(param)
+        optimizer = torch.optim.Adam([{'params': bias, 'lr': configs.lr*2}, 
+                                    {'params': not_bias}], 
+                                    lr=configs.lr, weight_decay=configs.weight_decay)
+        # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, configs.multistep_milestones, gamma=configs.multistep_gamma, verbose=False)
+        loss_fn = MultiBoxLossSSD(priors_cxcy=model.priors_cxcy, configs=configs)
+        # loss_fn = MultiBoxLoss(default_boxes=model.priors_cxcy, config=configs)
+        # plot_loss = []
+
+        #load checkpoint
+        # if configs.checkpoint:
+        #     print('Loaded checkpoint')
+        #     checkpoint = torch.load(configs.checkpoint, map_location=configs.device)
+        #     model.load_state_dict(checkpoint['model_state_dict'])
+        #     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        #     scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        #     plot_loss = checkpoint['plot_loss']
+        #     print("### Evaluating Model ###")
+        #     # @todo dhimitri add your evaluation files here
+        # training_progress_bar = tqdm(range(configs.epochs))
+        # epoch_progress_bar = tqdm(range(len(train_loader)))
+
+        # for e in range(configs.epochs):
+        #     training_progress_bar.update()
+        #     epoch_progress_bar.reset()
+
+        #     mean_loss = 0
+        #     for img, boxes, labels in train_loader:
+        #         epoch_progress_bar.update()
+        #         # img: tensor [n, c=1, h, w]
+        #         # boxes: list[n] of tensor[n_object, 4]
+        #         # labels: list[n] of tensor[n_object]
+        #         loc_output, cla_output, _ = model(img.to(configs.device))
+        #         boxes = [bb.to(configs.device) for bb in boxes]
+        #         labels = [ll.to(configs.device) for ll in labels]
+        #         loss = criterion(loc_output.to(configs.device), cla_output.to(configs.device), boxes, labels)
+        #         if configs.debug:
+        #             wandb.log({"train_loss_per_batch": loss.item()})
+        #         optimizer.zero_grad()
+        #         loss.backward()
+        #         if configs.clip_grad is not None:
+        #             utils_mnist_ssd.clip_gradient(optimizer, configs.clip_grad)
+                
+        #         optimizer.step()
+        #         mean_loss += loss.item()
+        #         # break
+        #     scheduler.step()
+        #     mean_loss /= len(train_loader)
+        #     plot_loss.append(mean_loss)
         
-    # # a dummy forward method to calculate the default boxes
-    test_input = torch.randn(1, 3, 160, 640)  # Maintain rectangular aspect ratio
-    pred_locs, pred_cls, fm_info = model(test_input)
-    feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
-    default_boxes = model.generate_default_boxes()
-    loss_fn = MultiBoxLoss(default_boxes=default_boxes, config=configs)
-    if configs.debug:
-        logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
+        # if (e%configs.print_frequency == configs.print_frequency - 1) or (e==0):
+        #     print(mean_loss)
+        #     print(criterion.loc_loss.item(), criterion.cla_loss.item())
+
+        # if e % configs.save_frequency == configs.save_frequency - 1:
+        #     utils_mnist_ssd.plot_loss(plot_loss, output_folder/'train_loss.png')
+        #     utils_mnist_ssd.plot_loss(plot_loss[-5:], output_folder/'train_loss_tail.png')
+        #     torch.save({'model_state_dict': model.state_dict(), 
+        #                 'optimizer_state_dict': optimizer.state_dict(),
+        #                 'scheduler_state_dict': scheduler.state_dict(),
+        #                 'config': configs,
+        #                 'plot_loss': plot_loss}, output_folder/'checkpoint.pth')
+    elif model_name=="ssd_captcha":
+        print(configs.base_conv_input_size)
+
+        model = SSDCaptcha()
+        # Initialize the optimizer, with twice the default learning rate for biases, as in the original Caffe repo
+        biases = list()
+        not_biases = list()
+        freeze_param_names = [
+        "backbone.conv1_1.weight", "backbone.conv1_1.bias",
+        "backbone.conv1_2.weight", "backbone.conv1_2.bias",
+        "backbone.conv2_1.weight", "backbone.conv2_1.bias",
+        "backbone.conv2_2.weight", "backbone.conv2_2.bias",
+        "backbone.conv3_1.weight", "backbone.conv3_1.bias",
+        "backbone.conv3_2.weight", "backbone.conv3_2.bias",
+        "backbone.conv3_3.weight", "backbone.conv3_3.bias",
+        "backbone.conv4_1.weight", "backbone.conv4_1.bias",
+        "backbone.conv4_2.weight", "backbone.conv4_2.bias",
+        "backbone.conv4_3.weight", "backbone.conv4_3.bias",
+        "backbone.conv5_1.weight", "backbone.conv5_1.bias",
+        "backbone.conv5_2.weight", "backbone.conv5_2.bias",
+        "backbone.conv5_3.weight", "backbone.conv5_3.bias",
+        "backbone.conv6.weight", "backbone.conv6.bias",
+        "backbone.conv7.weight", "backbone.conv7.bias"
+    ]   
+        freeze_backbone = False
+        if freeze_backbone:
+            freezed_params_groups = 0    
+            for param_name, param in model.named_parameters():
+                if param.requires_grad:
+                    if param_name.endswith('.bias'):
+                        biases.append(param)
+                    else:
+                        not_biases.append(param)
+                if param_name  in freeze_param_names:
+                    freezed_params_groups += 1
+                    print(f"freezing: {param_name}")
+                    param.requires_grad = False
+            print(f"freezed total of : {freezed_params_groups} groups")
+        optimizer = torch.optim.SGD(params=[{'params': biases, 'lr': 2 * configs.lr}, {'params': not_biases}],
+                                    lr=configs.lr, momentum=configs.momentum, weight_decay=configs.weight_decay)
+            
+        # # a dummy forward method to calculate the default boxes
+        test_input = torch.randn(1, 3, 160, 640)  # Maintain rectangular aspect ratio
+        pred_locs, pred_cls, fm_info = model(test_input)
+        feature_map_shapes = fm_info.values()  # Example feature map sizes for rectangular input
+        default_boxes = model.generate_default_boxes()
+        loss_fn = MultiBoxLoss(default_boxes=default_boxes, config=configs)
+        if configs.debug:
+            logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
+    
+    else:
+        raise Exception(f"Invalid {model_name}!")
+
+    # Train
     trainer = CaptchaTrainer(model, train_loader, val_loader, test_loader, loss_fn, optimizer, configs, logger)
     
+    
+    # train
+
     # train
     trainer.fit()

@@ -1,0 +1,12 @@
+base_conv_conv_layers: [3, 16, 32, 64]
+base_conv_input_size: 75
+aux_conv_conv_layers: [64, 64, 64]
+aux_conv_input_size: 8
+fm_prior_aspect_ratio: [[1., 2., 3., 0.3, 0.5],
+                        [1., 2., 3., 0.5, 0.3],
+                        [1., 2., 3., 0.5, 0.3],
+                        [1., 2., 3., 0.5, 0.3],
+                        [1., 2., 0.5], 
+                        [1., 2., 0.5]]
+print_frequency: 5
+save_frequency: 2

@@ -36,11 +36,11 @@ def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
     ])
     return transform(image)
 
-def get_img_transform():
+def get_img_transform(configs):
      transform = transforms.Compose([
         transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
-        transforms.Normalize(mean = [0.4429, 0.5330, 0.4279], std = [0.0841, 0.0718, 0.0796])
-        # transforms.Resize((300, 300)) # Normalize to range [-1, 1]
+        transforms.Normalize(mean = [0.4429, 0.5330, 0.4279], std = [0.0841, 0.0718, 0.0796]),
+        transforms.Resize((configs.img_height, configs.img_width)) # Normalize to range [-1, 1]
     ])
     # transform = transforms.Compose([
     #     transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
