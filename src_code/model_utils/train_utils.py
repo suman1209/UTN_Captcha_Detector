@@ -384,7 +384,10 @@ class CaptchaTrainer:
     def plot_bb(self, img_np, gt_boxes, matched_boxes, neg_boxes, epoch, i):
         # Image with bounding boxes
         fig, ax = plt.subplots(1, figsize=(8, 4))
-        ax.imshow(img_np)
+        if self.config.color:
+            ax.imshow(img_np)
+        else:
+            ax.imshow(img_np, cmap="gray")
         img_height, img_width, _ = img_np.shape
 
         # Get ground truth boxes and scale to image size
@@ -405,19 +408,19 @@ class CaptchaTrainer:
         # https://stackoverflow.com/questions/37435369/how-to-draw-a-rectangle-on-image
         for box in gt_boxes:
             x_min, y_min, x_max, y_max = box
-            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='pink', facecolor='none')
+            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='pink', facecolor='none')
             ax.add_patch(rect)
 
         # Plot matched boxes
         for box in matched_boxes:
             x_min, y_min, x_max, y_max = box
-            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='blue', facecolor='none')
+            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='blue', facecolor='none')
             ax.add_patch(rect)
         if neg_boxes is not None:
             # Plot neg boxes
             for box in neg_boxes:
                 x_min, y_min, x_max, y_max = box
-                rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='red', facecolor='none')
+                rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='red', facecolor='none')
                 ax.add_patch(rect)
 
         ax.legend()

@@ -3,6 +3,7 @@ data_configs:
   val_path: "datasets/utn_dataset/part2/val"
   test_path: "datasets/utn_dataset/part2/test"
   preprocessing_related:
+    color: false
     mean: 0.5 # for raw_image normalisation
     std: 0.5 # for raw_image normalisation
     downscale_factor: 4
@@ -25,7 +26,7 @@ model_configs:
   checkpoint: null # Training from Scratch
   # checkpoint: "checkpoints/model_checkpoint.pth"  # Resume training from last saved epoch
   print_freq: 500
-  epochs: 50
+  epochs: 200
   batch_size: 32
   device: "cuda" # either "cpu" or "cuda"
   backbone:
