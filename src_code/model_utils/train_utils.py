@@ -21,7 +21,7 @@ import torch
 from tqdm import tqdm
 from pathlib import Path as p
 from datetime import datetime
-
+from src_code.task_utils.evaluation import levenshtein
 os.environ['WANDB_CACHE_DIR'] = "./"
 os.environ['WANDB_DATA_DIR'] = "./"
 
@@ -66,6 +66,7 @@ class CaptchaTrainer:
         self.start_epoch = 0  # Default start epoch
         self.checkpoint_path = checkpoint_path
         self.map = None
+        self.edit_distance = None
         # Ensure checkpoint directory exists
         os.makedirs(self.checkpoint_path, exist_ok=True)
 
@@ -155,10 +156,14 @@ class CaptchaTrainer:
                 all_labels_gt.extend(labels)
                 all_difficulties_gt = [torch.zeros_like(i, dtype=torch.bool) for i in all_labels_gt]
         APs, mAP = utils_mnist_ssd.calculate_mAP(all_boxes_output, all_labels_output, all_scores_output, all_boxes_gt, all_labels_gt, all_difficulties_gt)
+        edit_distance = self.generate_edit_distance(self.model, self.val_loader, self.
+                                                    configs)
         if self.config.debug:
             print(f"{APs = }")
         print(f"{mAP = }")
+        print(f"{edit_distance = }")
         self.map = mAP
+        self.edit_distance = edit_distance
         if self.config.log_expt:
             self.logger.log({'mAP': mAP})
         captcha_max_len = 10
@@ -272,6 +277,33 @@ class CaptchaTrainer:
             print(f"Checkpoint loaded from {load_path} (starting from epoch {self.start_epoch})")
         else:
             print(f"No checkpoint found at {load_path}. Training from scratch.")
+            
+    def generate_edit_distance(model, val_loader, configs):
+        """
+        Generates captchas for the test set using the pre-loaded model and saves the results in a JSON file.
+        """
+        edit_distances = []
+        with torch.no_grad():
+            for images, gt_truth, labels_gt in val_loader:
+                images = images.to(configs.device)
+                for idx, image in enumerate(images):
+                    # print(image.unsqueeze(0))
+                    loc_preds, cls_preds, _ = model(image.unsqueeze(0))
+                    boxes, labels, scores = model.detect_object(loc_preds, cls_preds, min_score=0.25, max_overlap=0.5,top_k=20)
+                    
+                    list_boxes = boxes[0].tolist()
+                    assert len(list_boxes) == len(labels[0])
+                    for i, label_idx in enumerate(labels[0].tolist()):
+                        list_boxes[i].append(label_idx)
+                    list_boxes = sorted(list_boxes, key=lambda x: x[0])
+                    predicted_captcha = "".join([configs.category_id_labels[i[-1]] for i in list_boxes])
+                    gt_string = "".join([configs.category_id_labels[i] for i in labels_gt[idx].tolist()])
+                    edit_distance = levenshtein(gt_string, predicted_captcha)
+                    edit_distances.append(edit_distance)
+        mean_edit_distance, captcha_count = np.mean(np.array(edit_distances)), len(edit_distances)
+        return mean_edit_distance, captcha_count
+
+
 
     def fit(self):
         scheduler = self.get_scheduler()
@@ -307,7 +339,7 @@ class CaptchaTrainer:
                 scheduler.step()
                 print(f"{scheduler.get_last_lr() = }")
 
-        return self.map
+        return self.map, self.edit_distance
         # Plot the loss curves after training
         # self.plot_loss_curves(ce_losses, loc_losses, ce_pos_losses, ce_neg_losses)
 

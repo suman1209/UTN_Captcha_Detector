@@ -102,20 +102,20 @@ def main2(config_path: str | Path | None = None) -> None:
             configs.zoom_prob = config.zoom_prob
             configs.rotation_prob = config.rotation_prob
             configs.log_expt = False
-            configs.epochs = 20
-            map_score = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader,
+            configs.epochs = 10
+            map_score, edit_dist = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader,
                             logger=logger, model_name=configs.model_name)
-            return map_score
+            return edit_dist
 
         def main():
             wandb.init(project="Captcha-sweep")
-            map_score = objective(wandb.config)
-            wandb.log({"map_score": map_score})
+            edit_dist = objective(wandb.config)
+            wandb.log({"edit_dist": edit_dist})
 
         # 2: Define the search space
         sweep_configuration = {
             "method": "random",
-            "metric": {"goal": "maximize", "name": "map_score"},
+            "metric": {"goal": "minimize", "name": "edit_dist"},
             "parameters": {
                 "batch_size": {"values": [16, 32, 48, 64]},
                 "lr": {"values": [1e-2, 1e-3, 1e-4]},

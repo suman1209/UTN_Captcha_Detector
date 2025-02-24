@@ -24,7 +24,7 @@ data_configs:
     salt_pepper_prob: 0.2
 
 model_configs:
-  name: "ssd_mnist" # "ssd_mnist" or "ssd_captcha"
+  name: "ssd_mnist" # "full" or "ssd_captcha"
   save_checkpoint: False
   log_gradients: False
   checkpoint: null # Training from Scratch

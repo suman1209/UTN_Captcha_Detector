@@ -24,7 +24,7 @@ def levenshtein(x, y):
                 D[i, j - 1] + 1,         # Insertion
                 D[i - 1, j] + 1          # Deletion
             )
-    return D[-1, -1]
+    return D[-1, -1].item()
 
 
 def detect_objects(model, image):
