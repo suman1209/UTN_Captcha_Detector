@@ -117,6 +117,10 @@ if __name__ == "__main__":
     train_path = os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'images')
     output_path = os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'preprocessed')
 
+    # Val Data
+    # val_path = os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'images')
+    # output_path = os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'preprocessed')
+
     preprocess_dataset(
         train_path,
         output_path,
