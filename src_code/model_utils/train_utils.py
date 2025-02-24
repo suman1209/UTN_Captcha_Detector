@@ -156,8 +156,7 @@ class CaptchaTrainer:
                 all_labels_gt.extend(labels)
                 all_difficulties_gt = [torch.zeros_like(i, dtype=torch.bool) for i in all_labels_gt]
         APs, mAP = utils_mnist_ssd.calculate_mAP(all_boxes_output, all_labels_output, all_scores_output, all_boxes_gt, all_labels_gt, all_difficulties_gt)
-        edit_distance = self.generate_edit_distance(self.model, self.val_loader, self.
-                                                    configs)
+        edit_distance = self.generate_edit_distance(self.model, self.val_loader, self.config)
         if self.config.debug:
             print(f"{APs = }")
         print(f"{mAP = }")
@@ -177,6 +176,7 @@ class CaptchaTrainer:
                     loc_pred, cls_pred, fm_info = self.model(images)
                     loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
                     predicted_boxes, labels, scores = self.model.detect_object(loc_pred, cls_pred, min_score=0.25, max_overlap=0.5, top_k=20)
+                    predicted_boxes = predicted_boxes[random_image].tolist()
                     if debug_info == {}:
                         break
                     str_labels = ["".join([category_id_labels[i.item()] for i in label]) for label in labels]
@@ -186,14 +186,17 @@ class CaptchaTrainer:
                         label = str_labels[random_image]
                         gt_boxes = boxes[random_image].cpu().numpy()
                         neg_boxes = None
-                        pb = len(matched_boxes)
-                        self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, predicted_boxes, f"epoch={epoch} label = {label} num_pos_boxes={pb} {predicted_captcha = }", i)
-                        logits = debug_info["soft_maxed_pred"][random_image]
-                        GT_int = labels[random_image].tolist()
-                        GT_str = str_labels[random_image]
-                        my_table = wandb.Table(columns=["GT"] + list(category_id_labels.values()) + ["bg"], data=[[f"{GT_str[i]}-{GT_int[i]}"] + logit.tolist() for i, logit in enumerate(logits)])
+                        # if match_boxes is None:
+                        #     pb = -1
+                        # else:
+                        #     pb = len(matched_boxes)
+                        self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, predicted_boxes, f"epoch={epoch} label = {label} {predicted_captcha = }", i)
+                        # logits = debug_info["soft_maxed_pred"][random_image]
+                        # GT_int = labels[random_image].tolist()
+                        # GT_str = str_labels[random_image]
+                        # my_table = wandb.Table(columns=["GT"] + list(category_id_labels.values()) + ["bg"], data=[[f"{GT_str[i]}-{GT_int[i]}"] + logit.tolist() for i, logit in enumerate(logits)])
 
-                        self.log_logits(my_table, epoch)
+                        # self.log_logits(my_table, epoch)
                     break
 
     def log_logits(self, my_table, epoch):
@@ -278,7 +281,7 @@ class CaptchaTrainer:
         else:
             print(f"No checkpoint found at {load_path}. Training from scratch.")
             
-    def generate_edit_distance(model, val_loader, configs):
+    def generate_edit_distance(self, model, val_loader, configs):
         """
         Generates captchas for the test set using the pre-loaded model and saves the results in a JSON file.
         """
@@ -408,13 +411,19 @@ class CaptchaTrainer:
         gt_boxes[:, [1, 3]] *= img_height
 
         # Get ground truth boxes and scale to image size
-        matched_boxes[:, [0, 2]] *= img_width
-        matched_boxes[:, [1, 3]] *= img_height
+        # matched_boxes[:, [0, 2]] *= img_width
+        # matched_boxes[:, [1, 3]] *= img_height
 
         # Get ground truth boxes and scale to image size
         if neg_boxes is not None:
             neg_boxes[:, [0, 2]] *= img_width
             neg_boxes[:, [1, 3]] *= img_height
+        
+        if predicted_boxes is not None:
+            predicted_boxes = torch.Tensor(predicted_boxes)
+            predicted_boxes[:, [0, 2]] *= img_width
+            predicted_boxes[:, [1, 3]] *= img_height
+            predicted_boxes = predicted_boxes.tolist()
 
         # Plot ground truth boxes
         # https://stackoverflow.com/questions/37435369/how-to-draw-a-rectangle-on-image
@@ -424,10 +433,10 @@ class CaptchaTrainer:
             ax.add_patch(rect)
 
         # Plot matched boxes
-        for box in matched_boxes:
-            x_min, y_min, x_max, y_max = box
-            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='blue', facecolor='none')
-            ax.add_patch(rect)
+        # for box in matched_boxes:
+        #     x_min, y_min, x_max, y_max = box
+        #     rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='blue', facecolor='none')
+        #     ax.add_patch(rect)
         if neg_boxes is not None:
             # Plot neg boxes
             for box in neg_boxes:

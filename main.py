@@ -101,6 +101,8 @@ def main2(config_path: str | Path | None = None) -> None:
             configs.flip_prob = config.flip_prob
             configs.zoom_prob = config.zoom_prob
             configs.rotation_prob = config.rotation_prob
+            configs.line_prob = config.line_prob
+            configs.salt_pepper_prob = config.salt_pepper_prob
             configs.log_expt = False
             configs.epochs = 10
             map_score, edit_dist = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader,
@@ -119,11 +121,12 @@ def main2(config_path: str | Path | None = None) -> None:
             "parameters": {
                 "batch_size": {"values": [16, 32, 48, 64]},
                 "lr": {"values": [1e-2, 1e-3, 1e-4]},
-                "alpha": {"values": [0.1, 0.25, 0.5, 0.75, 1.0]},
+                "alpha": {"values": [0.1, 0.25, 0.5, 0.75]},
                 "hard_neg_pos": {"values": [0.5, 1, 2, 3, 4, 5]},
                 "rotation_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
                 "flip_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
-                "zoom_prob":{"values": [0.1, 0.2, 0.3, 0.4, 0.5]}
+                "line_prob":{"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
+                "salt_pepper_prob":{"values": [0.1, 0.2, 0.3, 0.4, 0.5]}
             },
         }
 
