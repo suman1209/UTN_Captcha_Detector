@@ -1,18 +1,19 @@
 task: 'train' # 'train', 'evaluate' or 'sweep'
 data_configs:
-  train_path: "datasets/utn_dataset_curated/part2/train"
-  val_path: "datasets/utn_dataset_curated/part2/val"
-  test_path: "datasets/utn_dataset_curated/part2/test"
+  train_path: "datasets/utn_dataset/part2/train"
+  val_path: "datasets/utn_dataset/part2/val"
+  test_path: "datasets/utn_dataset/part2/test"
   preprocessing_related:
+    color: false
     mean: 0.5 # for raw_image normalisation
     std: 0.5 # for raw_image normalisation
     downscale_factor: 4
   dataset_related:
-    train_preprocessed_dir: "./datasets/utn_dataset_curated/part2/train/images"
-    val_preprocessed_dir: "./datasets/utn_dataset_curated/part2/val/images"
-    test_preprocessed_dir: "./datasets/utn_dataset_curated/part2/test/images"
-    train_labels_dir: "./datasets/utn_dataset_curated/part2/train/labels"
-    val_labels_dir: "./datasets/utn_dataset_curated/part2/val/labels"
+    train_preprocessed_dir: "./datasets/utn_dataset/part2/train/images"
+    val_preprocessed_dir: "./datasets/utn_dataset/part2/val/images"
+    test_preprocessed_dir: "./datasets/utn_dataset/part2/test/images"
+    train_labels_dir: "./datasets/utn_dataset/part2/train/labels"
+    val_labels_dir: "./datasets/utn_dataset/part2/val/labels"
     augment: True
     shuffle: False
   augmentation_related:
@@ -20,7 +21,6 @@ data_configs:
     scale_range: (0.8, 1.2)
     zoom_prob: 0.3
     saturation_prob: 0
-    rotation_prob: 0
 
 model_configs:
   name: "ssd_mnist" # "ssd_mnist" or "ssd_captcha"
@@ -29,8 +29,8 @@ model_configs:
   checkpoint: null # Training from Scratch
   # checkpoint: "checkpoints/model_checkpoint.pth"  # Resume training from last saved epoch
   print_freq: 500
-  epochs: 10
-  batch_size: 2
+  epochs: 200
+  batch_size: 32
   device: "cuda" # either "cpu" or "cuda"
   backbone:
     name: VGG16
@@ -58,7 +58,7 @@ task_configs:
   img_height: 160 # original image height
   img_width: 640 # original image width
   debug: True # if True will display a lot of intermediate information for debugging purposes
-  log_expt: False # whether to log the experiment online or not
+  log_expt: True # whether to log the experiment online or not
   num_classes: 37 # A-Z(26), 0-9(10), background(1)
   min_cls_score: 0.01 # if the cls score for a bounding box is less than this, it is considered as background
   nms_iou_score: 0.1 # if the iou between two bounding boxes is less than this, it is suppressed

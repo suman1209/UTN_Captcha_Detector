@@ -25,7 +25,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
+wandb/
+artifacts/
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -169,3 +170,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+artifacts/
+datasets/utn_dataset/
+datasets/utn_dataset_curated/
+datasets/utn_dataset_curated
+docs_and_results/
+

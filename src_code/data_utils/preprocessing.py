@@ -36,6 +36,30 @@ def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
     ])
     return transform(image)
 
+def get_img_transform(configs):
+     transform = transforms.Compose([
+        transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
+        transforms.Normalize(mean = [0.4429, 0.5330, 0.4279], std = [0.0841, 0.0718, 0.0796]),
+        transforms.Resize((configs.img_height, configs.img_width)) # Normalize to range [-1, 1]
+    ])
+    # transform = transforms.Compose([
+    #     transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
+    # ])
+     return transform
+
+def get_rectangle_img_transform(configs):
+     transform = transforms.Compose([
+        transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
+        transforms.Grayscale(num_output_channels=1),
+        transforms.Normalize(mean = [0.5], std = [0.5]),
+        transforms.Resize((configs.img_height//configs.downscale_factor, configs.img_width//configs.downscale_factor)) # Normalize to range [-1, 1]
+    ])
+    # transform = transforms.Compose([
+    #     transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
+    # ])
+     return transform
+
+
 def preprocess_bounding_boxes(bbox, downscale_factor=None):
     """
     Adjust bounding box coordinates if a downscale factor is provided.

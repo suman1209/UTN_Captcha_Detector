@@ -10,12 +10,14 @@ class ConfigParser:
     def get_parser(self):
         # ADD NEW CONFIG PARAMETERS HERE
         # data configs
+        self.task = self.config_dict.get("task")
         data_configs = self.config_dict.get("data_configs")
         if data_configs is None:
             raise Exception("data_configs is not available!")
         self.train_path = data_configs.get("train_path")
         prep_config = data_configs.get("preprocessing_related")
         self.downscale_factor = prep_config.get("downscale_factor")
+        self.color = prep_config.get('color', True)
 
         # dataset configs
         dataset_config = data_configs.get("dataset_related")
@@ -37,6 +39,8 @@ class ConfigParser:
 
         # model configs
         model_configs = self.config_dict.get("model_configs")
+        self.model_name = model_configs.get("name")
+        self.log_gradients = model_configs.get("log_gradients")
         if model_configs is None:
             raise KeyError("model_configs is missing from the config file!")
         self.model_configs = model_configs  
@@ -60,14 +64,22 @@ class ConfigParser:
         self.lr = optim_configs.get("lr")
         self.momentum = optim_configs.get("momentum")
         self.weight_decay = optim_configs.get("weight_decay")
+        self.clip_grad = optim_configs.get("clip_grad")
         
         # task_configs
         task_configs = self.config_dict.get("task_configs")
         self.debug = task_configs.get("debug")
+        self.log_expt = task_configs.get("log_expt")
         self.num_classes = task_configs.get("num_classes")
         self.img_height = task_configs.get("img_height")
         self.img_width = task_configs.get("img_width")
         return self
+
+    def update(self, additional_config: dict):
+        msg = "only linear dict extension support"
+        for key, val in additional_config.items():
+            assert not isinstance(val, dict), msg
+            setattr(self, key, val)
 
     def __verify__argparse(self, config_path):
 

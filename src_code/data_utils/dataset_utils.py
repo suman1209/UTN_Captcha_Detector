@@ -2,6 +2,10 @@ import torch
 import os
 from torchvision.datasets import VisionDataset
 from .augmentation import Augmentations
+from .preprocessing import get_img_transform
+from PIL import Image
+
+import copy
 
 category_id_labels = {
     0: "0",
@@ -48,7 +52,7 @@ label_map['background'] = 36
 
 
 class CaptchaDataset(VisionDataset):
-    def __init__(self, preprocessed_dir, labels_dir=None, augment=True, config=None):
+    def __init__(self, preprocessed_dir, labels_dir=None, augment=True, config=None, img_transform=None):
         """
         Captcha Dataset for loading preprocessed data
 
@@ -62,15 +66,15 @@ class CaptchaDataset(VisionDataset):
         self.augment = augment
         self.augmentations = Augmentations(config) if augment else None
 
-        self.image_names = sorted([f for f in os.listdir(preprocessed_dir) if f.endswith(".pt")])
-
+        self.image_names = sorted([f for f in os.listdir(preprocessed_dir) if f.endswith((".pt", ".png"))])
+        self.img_transform = img_transform
+        
     def load_labels(self, image_name):
         """
         Loading bounding boxes and class labels
         """
 
-        label_file = os.path.join(self.labels_dir, image_name.replace(".pt",
-                                                                      ".txt"))
+        label_file = os.path.join(self.labels_dir, image_name.replace(".png", ".txt"))
 
         if not os.path.exists(label_file):
             raise FileNotFoundError(f"Label file not found: {label_file}")
@@ -106,8 +110,11 @@ class CaptchaDataset(VisionDataset):
             raise FileNotFoundError(f"Preprocessed file not found: {preprocessed_path}")
 
         # Load image tensor
-        image = torch.load(preprocessed_path)
+        image = Image.open(preprocessed_path).convert("RGB")  # Convert RGBA to RGB
 
+        if self.img_transform is not None:
+            image = self.img_transform(image)
+            
         # Load bounding boxes and labels
         if self.labels_dir:
             orig_bboxes, labels = self.load_labels(img_name)
@@ -153,3 +160,38 @@ def collate_fn(batch):
     else:
         images = torch.stack(batch, dim=0)
         return images
+
+def plot_image_with_bboxes(image, bboxes_orig, labels, title="Image with Bounding Boxes"):
+    img_height, img_width = image.shape[1], image.shape[2] 
+    print(img_height, img_width)
+    # Scale normalized bboxes to absolute pixel values for visualization
+    # TODO: --> * 4 used for non flipped images: works
+    # Issue with flipped ones
+    # How to test: set flip prob to one and you will see :)
+    # bboxes = bboxes_orig.copy()
+    bboxes = copy.deepcopy(bboxes_orig)
+    bboxes[:, [0, 2]] *= img_width
+    bboxes[:, [1, 3]] *= img_height
+
+    # Convert to integer values for plotting
+    bboxes_abs = bboxes.to(torch.int)
+    
+    print("BBoxes for Visualization:", bboxes_abs)
+
+    # Ensure labels are strings
+    if isinstance(labels, torch.Tensor):
+        labels = labels.tolist()
+    labels = [str(l) for l in labels]
+
+    # TODO: Image to RGB
+
+    # Draw bboxes
+    image_with_boxes = draw_bounding_boxes(image, bboxes_abs, labels=labels, colors="red", width=2)
+
+    # image tensor to NumPy for visualization
+    img = image_with_boxes.permute(1, 2, 0).numpy()
+
+    plt.imshow(img)
+    plt.axis("off")
+    plt.title(title)
+    plt.show()

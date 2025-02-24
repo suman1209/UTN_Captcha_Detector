@@ -79,7 +79,8 @@ class MultiBoxLoss(nn.Module):
         scaled_default_boxes = self.db.to(dev)# * img_scale / self.ds_factor
         default_boxes_xy = cxcy_to_xy(scaled_default_boxes)
         loss = -1
-        debug_info["soft_maxed_pred"] = []
+        if self.debug:
+            debug_info["soft_maxed_pred"] = []
         """
         populate the ground-truth loc offsets and labels
         for each default boxes in eahc image of the batch
@@ -88,13 +89,13 @@ class MultiBoxLoss(nn.Module):
             n_objects = boxes[i].size(0)
             # (N_objects, N_def_boxes)
             overlap = find_IoU(boxes[i], default_boxes_xy)
-            if self.debug:
-                debug_info["overlap_gt_def_boxes"].append(overlap)
+            # if self.debug:
+            #     debug_info["overlap_gt_def_boxes"].append(overlap)
             # (N_def_boxes)
             overlap_value_for_each_db, obj_for_each_db = overlap.max(dim=0)
-            if self.debug:
-                data = overlap_value_for_each_db
-                debug_info["overlap_value_for_each_db"] = data
+            # if self.debug:
+            #     data = overlap_value_for_each_db
+            #     debug_info["overlap_value_for_each_db"] = data
             _, db_for_each_obj = overlap.max(dim=1)  # (N_objects)
             if self.debug:
                 debug_info["db_for_each_obj"].append(db_for_each_obj)
@@ -132,9 +133,8 @@ class MultiBoxLoss(nn.Module):
             # (N_def_boxes, 4)
             gt_locs[i] = encode_bboxes(gt_cxcy_for_each_default_box.to(dev), self.db.to(dev))
             if self.debug:
-                debug_info["gt_locs"].append(gt_locs[i])
-                # breakpoint()
-                pred_softmaxed = torch.nn.functional.softmax(cls_pred[i], dim=1)[db_for_each_obj]
+                # debug_info["gt_locs"].append(gt_locs[i])
+                pred_softmaxed = torch.nn.functional.softmax(cls_pred[i], dim=1)[db_for_each_obj].to('cpu')
                 debug_info["soft_maxed_pred"].append(pred_softmaxed)
             
         # 1. Localization loss
@@ -142,8 +142,8 @@ class MultiBoxLoss(nn.Module):
         # bool Tensor mask (N_batch, N_def_boxes)
         # pos_db -> positive default boxes
         pos_db = gt_classes != label_map["background"]
-        if self.debug:
-            debug_info["gt_locs"].append(gt_locs[i])
+        # if self.debug:
+        #     debug_info["gt_locs"].append(gt_locs[i])
         # Localization loss is computed only over positive default boxes
 
         smooth_L1_loss = nn.SmoothL1Loss()
@@ -157,10 +157,10 @@ class MultiBoxLoss(nn.Module):
         # number of positive and hard-negative default boxes per image
         n_positive = pos_db.sum(dim=1)
         n_hard_negatives = self.neg_pos * n_positive
-        if self.debug:
-            debug_info["n_positive"] = n_positive
-            debug_info["n_hard_negatives"] = n_hard_negatives
-            debug_info["pos_default_boxes"] = [default_boxes_xy[pos_db[i]] for i in range(pos_db.size(0))]
+        # if self.debug:
+            # debug_info["n_positive"] = n_positive
+            # debug_info["n_hard_negatives"] = n_hard_negatives
+            # debug_info["pos_default_boxes"] = [default_boxes_xy[pos_db[i]] for i in range(pos_db.size(0))]
         
         # Find the loss for all priors
         cross_entropy_loss = nn.CrossEntropyLoss(reduce=False)
@@ -202,7 +202,6 @@ class MultiBoxLoss(nn.Module):
             debug_info["conf_neg_loss"] = conf_loss_all
             debug_info["ce_loss"] = confidence_loss
             debug_info["loc_loss"] = loc_loss
-            debug_info["ce_loss"] = confidence_loss
             ce_hard_neg_loss = confidence_hard_neg_loss.sum() / num_pos_boxes
             debug_info["ce_hard_neg_loss"] = ce_hard_neg_loss
             ce_pos_loss = confidence_pos_loss.sum() / num_pos_boxes
