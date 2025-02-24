@@ -76,9 +76,7 @@ class ConfigParser:
         return self
 
     def update(self, additional_config: dict):
-        msg = "only linear dict extension support"
         for key, val in additional_config.items():
-            assert not isinstance(val, dict), msg
             setattr(self, key, val)
 
     def __verify__argparse(self, config_path):
