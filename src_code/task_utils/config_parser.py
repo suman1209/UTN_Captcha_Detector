@@ -16,6 +16,7 @@ class ConfigParser:
         self.train_path = data_configs.get("train_path")
         prep_config = data_configs.get("preprocessing_related")
         self.downscale_factor = prep_config.get("downscale_factor")
+        self.color = prep_config.get('color', True)
 
         # dataset configs
         dataset_config = data_configs.get("dataset_related")

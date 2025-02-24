@@ -47,6 +47,18 @@ def get_img_transform(configs):
     # ])
      return transform
 
+def get_rectangle_img_transform(configs):
+     transform = transforms.Compose([
+        transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
+        transforms.Grayscale(num_output_channels=1),
+        transforms.Normalize(mean = [0.5], std = [0.5]),
+        transforms.Resize((configs.img_height//configs.downscale_factor, configs.img_width//configs.downscale_factor)) # Normalize to range [-1, 1]
+    ])
+    # transform = transforms.Compose([
+    #     transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
+    # ])
+     return transform
+
 
 def preprocess_bounding_boxes(bbox, downscale_factor=None):
     """

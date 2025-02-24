@@ -71,7 +71,7 @@ class CaptchaTrainer:
         self.logger = logger
         self.start_epoch = 0  # Default start epoch
         self.checkpoint_path = checkpoint_path
-
+        self.map = None
         # Ensure checkpoint directory exists
         os.makedirs(self.checkpoint_path, exist_ok=True)
 
@@ -176,9 +176,11 @@ class CaptchaTrainer:
         if self.config.debug:
             print(f"{APs = }")
         print(f"{mAP = }")
+        self.map = mAP
         if self.config.log_expt:
             self.logger.log({'mAP': mAP})
-        predicted_captcha = "".join([category_id_labels[i.item()] for i in all_labels_output[random_image]])
+        captcha_max_len = 10
+        predicted_captcha = "".join([category_id_labels[i.item()] for i in all_labels_output[random_image]][:captcha_max_len])
         if self.config.log_expt:
             with torch.no_grad():
                 for i, (images, boxes, labels) in enumerate(self.val_loader):
@@ -326,6 +328,7 @@ class CaptchaTrainer:
                 scheduler.step()
                 print(f"{scheduler.get_last_lr() = }")
 
+        return self.map
         # Plot the loss curves after training
         # self.plot_loss_curves(ce_losses, loc_losses, ce_pos_losses, ce_neg_losses)
 
@@ -383,8 +386,10 @@ class CaptchaTrainer:
     def plot_bb(self, img_np, gt_boxes, matched_boxes, neg_boxes, epoch, i):
         # Image with bounding boxes
         fig, ax = plt.subplots(1, figsize=(8, 4))
-        ax.imshow(img_np)
-
+        if self.config.color:
+            ax.imshow(img_np)
+        else:
+            ax.imshow(img_np, cmap="gray")
         img_height, img_width, _ = img_np.shape
 
         # Get ground truth boxes and scale to image size
@@ -405,19 +410,19 @@ class CaptchaTrainer:
         # https://stackoverflow.com/questions/37435369/how-to-draw-a-rectangle-on-image
         for box in gt_boxes:
             x_min, y_min, x_max, y_max = box
-            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='pink', facecolor='none')
+            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='pink', facecolor='none')
             ax.add_patch(rect)
 
         # Plot matched boxes
         for box in matched_boxes:
             x_min, y_min, x_max, y_max = box
-            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='blue', facecolor='none')
+            rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='blue', facecolor='none')
             ax.add_patch(rect)
         if neg_boxes is not None:
             # Plot neg boxes
             for box in neg_boxes:
                 x_min, y_min, x_max, y_max = box
-                rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=2, edgecolor='red', facecolor='none')
+                rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='red', facecolor='none')
                 ax.add_patch(rect)
 
         ax.legend()
@@ -430,15 +435,15 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
         base_conv = BaseConv(configs.base_conv_conv_layers, 
                     configs.base_conv_input_size, chosen_fm=[-2, -1],
                     norm=nn.BatchNorm2d, act_fn=nn.ReLU(), spectral=False)
-        base_size = pretty_print_module_list(base_conv.module_list, torch.zeros([1,3,configs.base_conv_input_size, configs.base_conv_input_size]))
-        # Create output folder
-
+        img, _, _ = next(iter(train_loader))
+        base_size = pretty_print_module_list(base_conv.module_list, img)
+        
         aux_conv = AuxConv(configs.aux_conv_conv_layers, 
                         configs.aux_conv_input_size, norm=nn.BatchNorm2d, act_fn=nn.ReLU(), spectral=False)
         aux_size = pretty_print_module_list(aux_conv.module_list, torch.zeros(base_size[-1]))
-
+        
         setattr(configs, 'fm_channels', [base_size[i][1] for i in base_conv.fm_id] + [aux_size[i][1] for i in aux_conv.fm_id])
-        setattr(configs, 'fm_size', [base_size[i][-1] for i in base_conv.fm_id] + [aux_size[i][-1] for i in aux_conv.fm_id])
+        setattr(configs, 'fm_size', [base_size[i][-2:] for i in base_conv.fm_id] + [aux_size[i][-2:] for i in aux_conv.fm_id])
         setattr(configs, 'n_fm', len(configs.fm_channels))
         setattr(configs,'fm_prior_aspect_ratio', configs.fm_prior_aspect_ratio[:configs.n_fm])
         setattr(configs,'fm_prior_scale', np.linspace(0.1, 0.9, configs.n_fm)) #[0.2, 0.375, 0.55, 0.725, 0.9] # [0.1, 0.2, 0.375, 0.55, 0.725, 0.9] 
@@ -446,9 +451,15 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
         setattr(configs, 'n_prior_per_pixel', [len(i)+1 for i in configs.fm_prior_aspect_ratio]) #in fm1, each pixel has 4 priors
         setattr(configs, 'multistep_milestones', list(range(10, configs.epochs, 5)))
 
-
-        utils_mnist_ssd.img_size = base_size[0][-1]
+        utils_mnist_ssd.img_size = [base_size[0][-2], base_size[0][-1]]
+        new_h, new_w = configs.img_height//configs.downscale_factor, configs.img_width//configs.downscale_factor
+        
+        assert utils_mnist_ssd.img_size == [new_h, new_w], "mismatch!"
+               
         model = SSD(configs, base_conv, aux_conv).to(configs.device)
+        # a dummy forward pass to assert correctness
+        locs, cls_, fms = model(img.to(configs.device))
+        assert locs.shape[1] == cls_.shape[1], "mismatch!"
         # create optimizer, scheduler, criterion, then load checkpoint if specified
         bias = []
         not_bias = []
@@ -522,4 +533,5 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
         logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
 
     # train
-    trainer.fit()
+    map_score = trainer.fit()
+    return map_score
