@@ -181,12 +181,15 @@ class CaptchaTrainer:
             self.logger.log({'mAP': mAP})
         captcha_max_len = 10
         predicted_captcha = "".join([category_id_labels[i.item()] for i in all_labels_output[random_image]][:captcha_max_len])
+        predicted_boxes = None
+        matched_boxes = None
         if self.config.log_expt:
             with torch.no_grad():
                 for i, (images, boxes, labels) in enumerate(self.val_loader):
                     images = images.to(self.config.device)
                     loc_pred, cls_pred, fm_info = self.model(images)
                     loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
+                    predicted_boxes, labels, scores = self.model.detect_object(loc_pred, cls_pred, min_score=0.25, max_overlap=0.5,top_k=20)
                     if debug_info == {}:
                         break
                     str_labels = ["".join([category_id_labels[i.item()] for i in label]) for label in labels]
@@ -195,14 +198,15 @@ class CaptchaTrainer:
                         img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
                         label = str_labels[random_image]
                         gt_boxes = boxes[random_image].cpu().numpy()
-
-                        matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
+                        # turn on for debugging
+                        # matched_boxes = debug_info['matched_gt_boxes'][random_image].cpu().numpy()
+                        
                         # to draw all the positive boxes that have been matched
                         # matched_boxes = debug_info["pos_default_boxes"][random_image].cpu().numpy()
                         neg_boxes = None
                         # neg_boxes = debug_info["hardneg_default_boxes"][random_image].cpu().numpy()
                         pb = len(matched_boxes)
-                        self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, f"epoch={epoch} label = {label} num_pos_boxes={pb} {predicted_captcha = }", i)
+                        self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, predicted_boxes, f"epoch={epoch} label = {label} num_pos_boxes={pb} {predicted_captcha = }", i)
                         logits = debug_info["soft_maxed_pred"][random_image]
                         GT_int = labels[random_image].tolist()
                         GT_str = str_labels[random_image]
@@ -383,7 +387,7 @@ class CaptchaTrainer:
             
         return scheduler
     
-    def plot_bb(self, img_np, gt_boxes, matched_boxes, neg_boxes, epoch, i):
+    def plot_bb(self, img_np, gt_boxes, matched_boxes, neg_boxes, predicted_boxes, epoch, i):
         # Image with bounding boxes
         fig, ax = plt.subplots(1, figsize=(8, 4))
         if self.config.color:
@@ -424,7 +428,13 @@ class CaptchaTrainer:
                 x_min, y_min, x_max, y_max = box
                 rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='red', facecolor='none')
                 ax.add_patch(rect)
-
+                
+        if predicted_boxes is not None:
+            # Plot neg boxes
+            for box in predicted_boxes:
+                x_min, y_min, x_max, y_max = box
+                rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='red', facecolor='none')
+                ax.add_patch(rect)
         ax.legend()
         ax.set_title(f"Image in epoch: {epoch}, step {i}")
         wandb.log({f"bbox_visual-{epoch =}": wandb.Image(fig)})
