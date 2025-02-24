@@ -16,7 +16,7 @@ from datetime import datetime
 import yaml
 
 
-def main(config_path: str | Path | None = None) -> None:
+def main2(config_path: str | Path | None = None) -> None:
     # all the parameters can be obtained from this configs object
     configs: ConfigParser = ConfigParser(config_path).get_parser()
 
@@ -90,14 +90,13 @@ def main(config_path: str | Path | None = None) -> None:
             # update the configs files
             configs.batch_size = config.batch_size
             configs.lr = config.lr
-            configs.debug = False
             configs.log_expt = False
             configs.epochs = 20
             map_score = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, 
                             logger=logger, model_name=configs.model_name)
             return map_score
 
-        def main_sweep():
+        def main():
             wandb.init(project="Captcha-sweep")
             map_score = objective(wandb.config)
             wandb.log({"map_score": map_score})
@@ -115,7 +114,7 @@ def main(config_path: str | Path | None = None) -> None:
         # 3: Start the sweep
         sweep_id = wandb.sweep(sweep=sweep_configuration, project="Captcha-sweep")
 
-        wandb.agent(sweep_id, function=main_sweep, count=10)
+        wandb.agent(sweep_id, function=main, count=10)
 
         if configs.log_expt:
             # close wandb
@@ -131,4 +130,4 @@ def main(config_path: str | Path | None = None) -> None:
         raise Exception(f'Undefined task! {configs.task}')
     
 if __name__ == "__main__":
-    main()
+    main2()
