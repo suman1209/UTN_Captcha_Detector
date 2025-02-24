@@ -4,7 +4,7 @@ import wandb
 from src_code.data_utils.dataset_utils import get_dataloader
 from src_code.data_utils.dataset_utils import CaptchaDataset
 from src_code.model_utils.train_utils import trainer
-from src_code.data_utils.preprocessing import get_img_transform, get_rectangle_img_transform
+from src_code.data_utils.preprocessing import get_img_transform, get_rectangle_img_transform, preprocess_all
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path as p
 from datetime import datetime
 import yaml
+import sys
 
 
 def main(config_path: str | Path | None = None) -> None:
@@ -40,6 +41,19 @@ def main(config_path: str | Path | None = None) -> None:
         logger = wandb
 
     print(f"{configs.batch_size = }")
+
+    if config_path is None:
+        if len(sys.argv) < 2:
+            print("Usage: python main.py <config_path>")
+            sys.exit(1)
+        config_path = sys.argv[1]  # Read config path from command line
+
+    config_path = str(config_path)  # Convert Path object to string
+    print(f"Using config: {config_path}")
+
+    print("### Run Preprocessing ###")   
+    preprocess_all(config_path)
+
     print("### Creating Dataloaders ###")
 
     # Create datasets

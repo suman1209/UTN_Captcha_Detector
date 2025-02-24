@@ -3,9 +3,14 @@ import torchvision.transforms as transforms
 from PIL import Image
 import os
 import yaml
+import sys
 
-with open(os.path.join(os.path.dirname(__file__), '..', '..', 'configs', 'configs_common.yaml'), 'r') as file:
-    config = yaml.safe_load(file)
+
+def load_config(config_path):
+    """Loads the YAML configuration file."""
+    config_path = str(config_path)  # Ensure config path is a string
+    with open(config_path, 'r') as file:
+        return yaml.safe_load(file)
 
 def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
     """
@@ -82,15 +87,19 @@ def preprocess_dataset(image_folder, output_folder, downscale_factor=None, mean=
     Use .pt if you want preprocessed tensors for fast loading.
     Keep .png if you prefer preprocessing on-the-fly during training.
     """
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)  # Create output directory if it doesn't exist
+    if os.path.exists(output_folder) and len(os.listdir(output_folder)) > 0:
+        print(f"Preprocessed data already exists at {output_folder}. Skipping preprocessing.")
+        return  # Skip processing if preprocessed data is found
+
+    print(f"Preprocessing dataset and saving to {output_folder}...")
+    os.makedirs(output_folder, exist_ok=True)  # Ensure the output folder exists
 
     for img_name in os.listdir(image_folder):
         if img_name.endswith('.png'):
             img_path = os.path.join(image_folder, img_name)
             processed_image = preprocess_image(img_path, downscale_factor, mean, std)
             output_path = os.path.join(output_folder, img_name.replace('.png', '.pt'))
-            torch.save(processed_image, output_path)  # Save preprocessed image tensor
+            torch.save(processed_image, output_path)
             print(f"Saved preprocessed image to: {output_path}")
 
 def deprocess_image(tensor, mean=0.5, std=0.5):
@@ -103,32 +112,41 @@ def deprocess_image(tensor, mean=0.5, std=0.5):
     ])
     return inv_transform(tensor)
 
-if __name__ == "__main__":
+def preprocess_all(config_path):
+    """Preprocess train, validation, and test datasets only if necessary."""
+    config = load_config(config_path)  # Load the YAML config
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    # val Datawwwwww
-    # val_path = os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'images')
-    # output_path = os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'preprocessed')
     
-    # Test Datawwwwww
-    # test_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'images')
-    # output_path = os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'preprocessed')
+    datasets = {
+        "train": {
+            "image_path": os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'images'),
+            "output_path": os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'preprocessed')
+        },
+        "val": {
+            "image_path": os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'images'),
+            "output_path": os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'preprocessed')
+        },
+        "test": {
+            "image_path": os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'images'),
+            "output_path": os.path.join(script_dir, '..', '..', config['data_configs']['test_path'], 'preprocessed')
+        }
+    }
 
-    # Train Data
-    train_path = os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'images')
-    output_path = os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'preprocessed')
+    for dataset, paths in datasets.items():
+        print(f"\nChecking {dataset} dataset preprocessing...")
+        preprocess_dataset(
+            paths["image_path"],
+            paths["output_path"],
+            downscale_factor=config['data_configs']['preprocessing_related'].get('downscale_factor', None),
+            mean=config['data_configs']['preprocessing_related']['mean'],
+            std=config['data_configs']['preprocessing_related']['std']
+        )
 
-    # Val Data
-    # val_path = os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'images')
-    # output_path = os.path.join(script_dir, '..', '..', config['data_configs']['val_path'], 'preprocessed')
-
-    preprocess_dataset(
-        train_path,
-        output_path,
-        downscale_factor=config['data_configs']['preprocessing_related'].get('downscale_factor', None),
-        mean=config['data_configs']['preprocessing_related']['mean'],
-        std=config['data_configs']['preprocessing_related']['std']
-    )
-    print("Preprocessing complete with hyperparameters from configs_common.yaml.")
-
-    # Run preprocessing with a downscale factor and normalization parameters
-    # preprocess_dataset(dataset_path, output_path, downscale_factor=2, mean=0.5, std=0.5)
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python src_code/data_utils/preprocessing.py <config_path>")
+        sys.exit(1)
+    
+    config_path = sys.argv[1]  # Get config path from command line
+    preprocess_all(config_path)
