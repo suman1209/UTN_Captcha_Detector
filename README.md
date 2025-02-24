@@ -1,18 +1,25 @@
 # UTN_Captcha_Detector
 
-This is a project to detect CAPTCHA using computer vision
+This is a project to detect CAPTCHA using a single-shot multi-box detector.
 
-Main Resource for the loss function used: https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection
+
+
+Main Resource for the loss function used:
+
+https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection
+
+https://www.kaggle.com/code/thongnon1996/object-detection-mnist-ssd-pytorch-from-scratch
 
 ![Project_Structure](docs_and_results/images/project_structure.png "Project Structure")
 
-# Contributing guidelines
+# Contribution guidelines
 
 1. Please check linting issues with flake8
 
    ``flake8``
 2. keep requirements.txt and requirements_conda.yaml simulataneously updated
-3. review each other code
+3. review each others code
+4. add references for any code snippets used from outside
 
 # CIP Pool setup
 
@@ -65,11 +72,9 @@ activate the environment, change to desired paramters in configs/configs_common.
 python main.py configs/configs_common.yaml
 ```
 
-
 # Project Structure
 
 ```
-checkpoints  
 configs  
 datasets  
 docs_and_results  
