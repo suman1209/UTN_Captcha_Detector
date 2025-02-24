@@ -3,6 +3,8 @@ import torch
 import math
 from torchvision.transforms import v2
 import torchvision.transforms.functional as F
+from PIL import ImageDraw
+import numpy as np
 
 
 class Augmentations:
@@ -13,12 +15,11 @@ class Augmentations:
         """
         self.flip_prob = config.flip_prob
         self.flip = v2.RandomHorizontalFlip(p=1.0)
-        self.scale_range = config.scale_range
         self.zoom_prob = config.zoom_prob
-        self.zoom_range = (1.5, 2.0)
-        self.saturation_prob = config.saturation_prob
         self.rotation_prob = config.rotation_prob
         self.rotation_range = (-30, 30)
+        self.line_prob = config.line_prob
+        self.salt_pepper_prob = config.salt_pepper_prob
 
     def apply(self, image, bboxes, labels):
         """
@@ -33,13 +34,17 @@ class Augmentations:
         if random.random() < self.zoom_prob:
             image, bboxes, labels = self.zoom(image, bboxes, labels)
 
-        # Apply saturation changes
-        if random.random() < self.saturation_prob:
-            image = self.saturation_change(image)
-
         # Apply rotation
         if random.random() < self.rotation_prob:
             image, bboxes, labels = self.rotate(image, bboxes, labels)
+
+        # Apply random lines
+        if random.random() < self.line_prob:
+            image = self.random_lines(image, num_lines=2)
+
+        # Apply salt and pepper noise
+        if random.random() < self.salt_pepper_prob:
+            image = self.salt_and_pepper_noise(image, threshold=0.1)
 
         return image, bboxes, labels
 
@@ -145,22 +150,6 @@ class Augmentations:
 
         return image, new_bboxes, new_labels
 
-    def saturation_change(self, image, saturation_lowest=1.8, saturation_highest=3):
-        """
-        Change the saturation of the image.
-        BBoxes stay the same.
-        """
-
-        # TODO:
-        # get images in RGB to change saturation properly
-        # de-normalize?
-
-        saturation_fac = random.uniform(saturation_lowest, saturation_highest)
-
-        image = F.adjust_saturation(image, saturation_fac)
-
-        return image
-
     def rotate(self, image, bboxes, labels, bbox_in_new_image=1.0):
         """
         Rotate the image and the bounding boxes.
@@ -245,3 +234,40 @@ class Augmentations:
         new_labels = torch.tensor(new_labels, dtype=torch.long)
 
         return image, new_bboxes, new_labels
+
+    def random_lines(self, image, num_lines=3):
+        """
+        Add random lines to corrupt the image.
+        """
+        image = F.to_pil_image(image)
+        image = image.convert("L")
+        draw = ImageDraw.Draw(image)
+        width, height = image.size
+        for _ in range(num_lines):
+            pt1 = (random.randint(0, width), random.randint(0, height))
+            pt2 = (random.randint(0, width), random.randint(0, height))
+            draw.line([pt1, pt2], fill=0, width=random.randint(1, 3))
+        return F.to_tensor(image)
+
+    def salt_and_pepper_noise(self, image, threshold=0.2):
+        """
+        Add salt and pepper noise to the image.
+
+        source: https://www.simonwenkel.com/notes/ai/practical/vision/progressive-sprinkles-and-salt-and-pepper-noise.html#:~:text=“Salt%20and%20Pepper”%20noise%20is,the%20same%20as%20Gaussian%20noise.
+        """
+
+        image = image.squeeze(0).numpy()
+        height, width = image.shape
+
+        # Generate random matrix
+        random_matrix = np.random.rand(height, width)
+
+        # Apply salt noise
+        image[random_matrix >= (1 - threshold)] = 0.5
+
+        # Apply pepper noise
+        image[random_matrix <= threshold] = 0.5
+
+        image = torch.tensor(image, dtype=torch.float32).unsqueeze(0)
+
+        return image
