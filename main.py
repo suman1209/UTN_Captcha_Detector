@@ -104,7 +104,7 @@ def main2(config_path: str | Path | None = None) -> None:
             configs.line_prob = config.line_prob
             configs.salt_pepper_prob = config.salt_pepper_prob
             configs.log_expt = False
-            configs.epochs = 10
+            configs.epochs = 5
             map_score, edit_dist = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader,
                             logger=logger, model_name=configs.model_name)
             return edit_dist
@@ -125,6 +125,7 @@ def main2(config_path: str | Path | None = None) -> None:
                 "hard_neg_pos": {"values": [0.5, 1, 2, 3, 4, 5]},
                 "rotation_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
                 "flip_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
+                "zoom_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
                 "line_prob":{"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
                 "salt_pepper_prob":{"values": [0.1, 0.2, 0.3, 0.4, 0.5]}
             },
@@ -133,7 +134,7 @@ def main2(config_path: str | Path | None = None) -> None:
         # 3: Start the sweep
         sweep_id = wandb.sweep(sweep=sweep_configuration, project="Captcha-sweep")
 
-        wandb.agent(sweep_id, function=main, count=10)
+        wandb.agent(sweep_id, function=main, count=20)
 
         if configs.log_expt:
             # close wandb

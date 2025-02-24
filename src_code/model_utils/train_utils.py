@@ -156,7 +156,7 @@ class CaptchaTrainer:
                 all_labels_gt.extend(labels)
                 all_difficulties_gt = [torch.zeros_like(i, dtype=torch.bool) for i in all_labels_gt]
         APs, mAP = utils_mnist_ssd.calculate_mAP(all_boxes_output, all_labels_output, all_scores_output, all_boxes_gt, all_labels_gt, all_difficulties_gt)
-        edit_distance = self.generate_edit_distance(self.model, self.val_loader, self.config)
+        edit_distance, count = self.generate_edit_distance(self.model, self.val_loader, self.config)
         if self.config.debug:
             print(f"{APs = }")
         print(f"{mAP = }")
@@ -304,7 +304,7 @@ class CaptchaTrainer:
                     edit_distance = levenshtein(gt_string, predicted_captcha)
                     edit_distances.append(edit_distance)
         mean_edit_distance, captcha_count = np.mean(np.array(edit_distances)), len(edit_distances)
-        return mean_edit_distance, captcha_count
+        return mean_edit_distance.item(), captcha_count
 
 
 
