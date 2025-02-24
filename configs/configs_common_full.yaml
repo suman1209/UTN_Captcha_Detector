@@ -1,3 +1,4 @@
+task: 'train' # 'train', 'evaluate' or 'sweep'
 data_configs:
   train_path: "datasets/utn_dataset/part2/train"
   val_path: "datasets/utn_dataset/part2/val"
@@ -23,6 +24,8 @@ data_configs:
 
 model_configs:
   name: "ssd_mnist" # "ssd_mnist" or "ssd_captcha"
+  save_checkpoint: False
+  log_gradients: False
   checkpoint: null # Training from Scratch
   # checkpoint: "checkpoints/model_checkpoint.pth"  # Resume training from last saved epoch
   print_freq: 500

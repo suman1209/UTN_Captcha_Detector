@@ -318,7 +318,7 @@ class CaptchaTrainer:
             ce_neg_losses.append(ce_neg_loss.avg)
 
             # Save checkpoint
-            if epoch in save_epoch_list:
+            if epoch in save_epoch_list and self.save_checkpoint:
                 self.save_checkpoint(epoch)
             
             # Run validation (if applicable)
@@ -529,7 +529,7 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
 
     # Train
     trainer = CaptchaTrainer(model, train_loader, val_loader, test_loader, loss_fn, optimizer, configs, logger)
-    if configs.log_expt:
+    if configs.log_expt and configs.log_gradients:
         logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
 
     # train

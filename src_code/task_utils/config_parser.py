@@ -10,6 +10,7 @@ class ConfigParser:
     def get_parser(self):
         # ADD NEW CONFIG PARAMETERS HERE
         # data configs
+        self.task = self.config_dict.get("task")
         data_configs = self.config_dict.get("data_configs")
         if data_configs is None:
             raise Exception("data_configs is not available!")
@@ -39,6 +40,7 @@ class ConfigParser:
         # model configs
         model_configs = self.config_dict.get("model_configs")
         self.model_name = model_configs.get("name")
+        self.log_gradients = model_configs.get("log_gradients")
         if model_configs is None:
             raise KeyError("model_configs is missing from the config file!")
         self.model_configs = model_configs  
