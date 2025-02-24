@@ -146,7 +146,7 @@ class PredictionConv(nn.Module):
     def postprocess(self, x, k):
         '''x: output of self.(loc/cla)module_list. size [batch, n_boxes*k, h, w]. reshape into [batch, n_boxes*h*w, k]
            k: 4 or num_classes'''
-        x = x.permute([0, 2, 3, 1]).contiguous()
+        x = x.permute([0, 3, 2, 1]).contiguous()
         x = x.view(x.size(0), -1, k)
         return x
 
