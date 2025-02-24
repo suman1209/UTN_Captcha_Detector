@@ -42,7 +42,7 @@ class MultiBoxLoss(nn.Module):
         debug_info["gt_locs"] = []
         debug_info["default_box_for_each_obj"] = []
         debug_info["pos_default_boxes"] = []
-        
+
         return debug_info
 
     def forward(self, locs_pred, cls_pred, boxes, labels, downscale_factor=4):
@@ -126,24 +126,21 @@ class MultiBoxLoss(nn.Module):
             gt_classes[i] = self.label_each_db
 
             # Encode pred bboxes (finding the ground-truth offsets)
-            gt_xy_for_each_db = boxes[i][obj_for_each_db] #* self.ds_factor
+            gt_xy_for_each_db = boxes[i][obj_for_each_db]  # * self.ds_factor
             gt_cxcy_for_each_default_box = xy_to_cxcy(gt_xy_for_each_db)
-            # remember that we need to scale it back to normalised coordinates
-            # gt_cxcy_for_each_default_box /= self.img_scale
             # (N_def_boxes, 4)
             gt_locs[i] = encode_bboxes(gt_cxcy_for_each_default_box.to(dev), self.db.to(dev))
             if self.debug:
                 # debug_info["gt_locs"].append(gt_locs[i])
                 pred_softmaxed = torch.nn.functional.softmax(cls_pred[i], dim=1)[db_for_each_obj].to('cpu')
                 debug_info["soft_maxed_pred"].append(pred_softmaxed)
-            
+
         # 1. Localization loss
         # Identify priors that are positive
         # bool Tensor mask (N_batch, N_def_boxes)
         # pos_db -> positive default boxes
         pos_db = gt_classes != label_map["background"]
-        # if self.debug:
-        #     debug_info["gt_locs"].append(gt_locs[i])
+
         # Localization loss is computed only over positive default boxes
 
         smooth_L1_loss = nn.SmoothL1Loss()
@@ -157,11 +154,7 @@ class MultiBoxLoss(nn.Module):
         # number of positive and hard-negative default boxes per image
         n_positive = pos_db.sum(dim=1)
         n_hard_negatives = self.neg_pos * n_positive
-        # if self.debug:
-            # debug_info["n_positive"] = n_positive
-            # debug_info["n_hard_negatives"] = n_hard_negatives
-            # debug_info["pos_default_boxes"] = [default_boxes_xy[pos_db[i]] for i in range(pos_db.size(0))]
-        
+
         # Find the loss for all priors
         cross_entropy_loss = nn.CrossEntropyLoss(reduce=False)
         pred = cls_pred.view(-1, num_classes)
@@ -208,5 +201,5 @@ class MultiBoxLoss(nn.Module):
             debug_info["ce_pos_loss"] = ce_pos_loss
             debug_info["loss"] = loss
         if not self.debug:
-            debug_info = {} 
+            debug_info = {}
         return loss, debug_info

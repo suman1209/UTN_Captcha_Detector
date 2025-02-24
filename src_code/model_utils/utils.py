@@ -23,16 +23,18 @@ def cxcy_to_torch_xy(bboxes):
     ], dim=1)
     return bboxes_inverted
 
+
 def xy_to_cxcy(bboxes):
     '''
         Convert bboxes from (xmin, ymin, xmax, ymax) to (cx, cy, w, h)
         bboxes: Bounding boxes, a tensor of dimensions (n_object, 4)
-        
+
         Out: bboxes in center coordinate
     '''
     return torch.cat([(bboxes[:, 2:] + bboxes[:, :2]) / 2,
                       bboxes[:, 2:] - bboxes[:, :2]], 1)
-    
+
+
 def torch_xy_to_cxcy(bboxes_torch_xy):
     '''
     Convert bboxes from (xmin, ymin, xmax, ymax) with inverted axes

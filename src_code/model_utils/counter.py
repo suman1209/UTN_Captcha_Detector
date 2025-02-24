@@ -4,17 +4,16 @@ from matplotlib import pyplot as plt
 from backbone import VGG16Backbone
 import torch
 import torch.nn as nn
-from torchvision import models
-import torchvision
 import torch.nn.functional as F
 import sys
-sys.path.insert(0, "../../")
 from src_code.data_utils.dataset_utils import CaptchaDataset, get_dataloader
 from src_code.task_utils.config_parser import ConfigParser
 import torch.optim as optim
 import wandb
 import os
 from datetime import datetime
+
+sys.path.insert(0, "../../")
 
 configs_dict = {
     "data_configs": {
@@ -107,7 +106,7 @@ class Trainer:
         self.loss_function = nn.MSELoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr = config.lr)
         self.checkpoint_path = "./"
-        
+
     def backbone_train(self):
         self.model.train()
         total_loss = 0
@@ -127,19 +126,19 @@ class Trainer:
 
         average_loss = total_loss / len(self.train_loader)
         print(f"Train Loss: {average_loss:}")
-        
+
 
     def backbone_validation(self):
         self.model.eval() 
         total_loss = 0
 
-        with torch.no_grad(): 
-            
+        with torch.no_grad():
+
             for image, bboxes, labels in self.val_loader:
                 random_image = random.randint(0, image.shape[0] - 1)
                 targets = torch.tensor([len(bb) for bb in bboxes])
                 image, targets = image.to(self.device), targets.to(self.device, dtype=torch.float32).unsqueeze(1)
-                
+
                 # Forward pass
                 pred = round(self.model(image)[random_image].item(), 5)
                 gt = targets[random_image].item()
@@ -150,7 +149,7 @@ class Trainer:
                 # Get ground truth boxes and scale to image size
                 gt_boxes[:, [0, 2]] *= img_width
                 gt_boxes[:, [1, 3]] *= img_height
-                
+
                 # just for one image
                 # Image with bounding boxes
                 fig, ax = plt.subplots(1, figsize=(8, 4))
@@ -175,7 +174,7 @@ class Trainer:
             self.backbone_validation()
             if epoch in save_epochs:
                 self.save_checkpoint()
-                
+
     def save_checkpoint(self, filename="vgg_counter_checkpoint"):
         """Saves model checkpoint."""
         # Get the current date and time
@@ -189,17 +188,14 @@ class Trainer:
         print(f"Checkpoint saved at {save_path}")
 
 
-
-
-
-# # hyperparameters
+# hyperparameters
 config = ConfigParser(configs_dict).get_parser()
 
 wandb.init(
     project = "computer-vision-2025-Project-backbone",
     config = config
 )
-    
+
 
 train_set = CaptchaDataset(config)
 image, bboxes, labels = train_set[0]
@@ -213,9 +209,6 @@ model = CountBackbone()
 output = model(images)
 
 images, bboxes, labels = next(iter(train_loader))
-
-# for image, bboxes, labels in train_loader:
-#     print(len(bboxes))
 
 trainer = Trainer(model, train_loader, train_loader, config=config)
 trainer.train()

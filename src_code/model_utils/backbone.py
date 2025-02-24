@@ -1,8 +1,7 @@
-import torch
 import torch.nn as nn
-from torchvision import models
 import torchvision
 import torch.nn.functional as F
+
 
 class VGG16Backbone(nn.Module):
     """
@@ -40,7 +39,7 @@ class VGG16Backbone(nn.Module):
         self.conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6)  # atrous convolution
 
         self.conv7 = nn.Conv2d(1024, 1024, kernel_size=1)
-        
+
         # Load pretrained layers
         if self.pretrained:
             self.load_pretrained_layers()
@@ -54,7 +53,7 @@ class VGG16Backbone(nn.Module):
         """
         out = F.relu(self.conv1_1(image))  # (N, 64, 300, 300)
         out = F.relu(self.conv1_2(out))  # (N, 64, 300, 300)
-        
+
         out = self.pool1(out)  # (N, 64, 150, 150)
         out = F.relu(self.conv2_1(out))  # (N, 128, 150, 150)
         out = F.relu(self.conv2_2(out))  # (N, 128, 150, 150)

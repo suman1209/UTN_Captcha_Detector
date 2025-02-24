@@ -2,7 +2,8 @@ import torch
 import os
 from torchvision.datasets import VisionDataset
 from .augmentation import Augmentations
-from .preprocessing import get_img_transform
+from torchvision.utils import draw_bounding_boxes
+import matplotlib.pyplot as plt
 from PIL import Image
 
 import copy
@@ -68,7 +69,7 @@ class CaptchaDataset(VisionDataset):
 
         self.image_names = sorted([f for f in os.listdir(preprocessed_dir) if f.endswith((".pt", ".png"))])
         self.img_transform = img_transform
-        
+
     def load_labels(self, image_name):
         """
         Loading bounding boxes and class labels
@@ -114,7 +115,7 @@ class CaptchaDataset(VisionDataset):
 
         if self.img_transform is not None:
             image = self.img_transform(image)
-            
+
         # Load bounding boxes and labels
         if self.labels_dir:
             orig_bboxes, labels = self.load_labels(img_name)
@@ -153,7 +154,7 @@ def collate_fn(batch):
     """
     Function to handle variable-sized data.
     """
-    if isinstance(batch[0], tuple):  
+    if isinstance(batch[0], tuple):
         images, bboxes, labels = zip(*batch)
         images = torch.stack(images, dim=0)
         return images, list(bboxes), list(labels)
@@ -161,29 +162,22 @@ def collate_fn(batch):
         images = torch.stack(batch, dim=0)
         return images
 
+
 def plot_image_with_bboxes(image, bboxes_orig, labels, title="Image with Bounding Boxes"):
-    img_height, img_width = image.shape[1], image.shape[2] 
-    print(img_height, img_width)
+    img_height, img_width = image.shape[1], image.shape[2]
+
     # Scale normalized bboxes to absolute pixel values for visualization
-    # TODO: --> * 4 used for non flipped images: works
-    # Issue with flipped ones
-    # How to test: set flip prob to one and you will see :)
-    # bboxes = bboxes_orig.copy()
     bboxes = copy.deepcopy(bboxes_orig)
     bboxes[:, [0, 2]] *= img_width
     bboxes[:, [1, 3]] *= img_height
 
     # Convert to integer values for plotting
     bboxes_abs = bboxes.to(torch.int)
-    
-    print("BBoxes for Visualization:", bboxes_abs)
 
     # Ensure labels are strings
     if isinstance(labels, torch.Tensor):
         labels = labels.tolist()
     labels = [str(l) for l in labels]
-
-    # TODO: Image to RGB
 
     # Draw bboxes
     image_with_boxes = draw_bounding_boxes(image, bboxes_abs, labels=labels, colors="red", width=2)

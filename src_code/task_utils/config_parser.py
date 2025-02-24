@@ -65,7 +65,7 @@ class ConfigParser:
         self.momentum = optim_configs.get("momentum")
         self.weight_decay = optim_configs.get("weight_decay")
         self.clip_grad = optim_configs.get("clip_grad")
-        
+
         # task_configs
         task_configs = self.config_dict.get("task_configs")
         self.debug = task_configs.get("debug")

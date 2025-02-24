@@ -12,6 +12,7 @@ def load_config(config_path):
     with open(config_path, 'r') as file:
         return yaml.safe_load(file)
 
+
 def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
     """
     Preprocess a CAPTCHA image following these steps:
@@ -41,16 +42,15 @@ def preprocess_image(image_path, downscale_factor=None, mean=0.5, std=0.5):
     ])
     return transform(image)
 
+
 def get_img_transform(configs):
      transform = transforms.Compose([
         transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
         transforms.Normalize(mean = [0.4429, 0.5330, 0.4279], std = [0.0841, 0.0718, 0.0796]),
         transforms.Resize((configs.img_height, configs.img_width)) # Normalize to range [-1, 1]
     ])
-    # transform = transforms.Compose([
-    #     transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
-    # ])
      return transform
+
 
 def get_rectangle_img_transform(configs):
      transform = transforms.Compose([
@@ -59,9 +59,6 @@ def get_rectangle_img_transform(configs):
         transforms.Normalize(mean = [0.5], std = [0.5]),
         transforms.Resize((configs.img_height//configs.downscale_factor, configs.img_width//configs.downscale_factor)) # Normalize to range [-1, 1]
     ])
-    # transform = transforms.Compose([
-    #     transforms.ToTensor(),  # Convert image to tensor (float range 0-1)
-    # ])
      return transform
 
 
@@ -79,6 +76,7 @@ def preprocess_bounding_boxes(bbox, downscale_factor=None):
             height / downscale_factor
         ]
     return bbox
+
 
 def preprocess_dataset(image_folder, output_folder, downscale_factor=None, mean=0.5, std=0.5):
     """
@@ -102,6 +100,7 @@ def preprocess_dataset(image_folder, output_folder, downscale_factor=None, mean=
             torch.save(processed_image, output_path)
             print(f"Saved preprocessed image to: {output_path}")
 
+
 def deprocess_image(tensor, mean=0.5, std=0.5):
     """
     Convert a normalized tensor back to an image for visualization or saving.
@@ -112,12 +111,13 @@ def deprocess_image(tensor, mean=0.5, std=0.5):
     ])
     return inv_transform(tensor)
 
+
 def preprocess_all(config_path):
     """Preprocess train, validation, and test datasets only if necessary."""
     config = load_config(config_path)  # Load the YAML config
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    
+
     datasets = {
         "train": {
             "image_path": os.path.join(script_dir, '..', '..', config['data_configs']['train_path'], 'images'),
@@ -147,6 +147,6 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python src_code/data_utils/preprocessing.py <config_path>")
         sys.exit(1)
-    
+
     config_path = sys.argv[1]  # Get config path from command line
     preprocess_all(config_path)

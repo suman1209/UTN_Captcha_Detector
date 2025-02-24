@@ -4,15 +4,7 @@ import wandb
 from src_code.data_utils.dataset_utils import get_dataloader
 from src_code.data_utils.dataset_utils import CaptchaDataset
 from src_code.model_utils.train_utils import trainer
-from src_code.data_utils.preprocessing import get_img_transform, get_rectangle_img_transform, preprocess_all
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-from tqdm import tqdm 
-import matplotlib.pyplot as plt
-from pathlib import Path as p
-from datetime import datetime
+from src_code.data_utils.preprocessing import get_rectangle_img_transform, preprocess_all
 import yaml
 import sys
 
@@ -152,6 +144,6 @@ def main2(config_path: str | Path | None = None) -> None:
 
     else:
         raise Exception(f'Undefined task! {configs.task}')
-    
+
 if __name__ == "__main__":
     main2()
