@@ -2,8 +2,6 @@
 
 This is a project to detect CAPTCHA using a single-shot multi-box detector.
 
-
-
 Main Resource for the loss function used:
 
 https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection
@@ -14,6 +12,11 @@ https://www.kaggle.com/code/thongnon1996/object-detection-mnist-ssd-pytorch-from
 
 ![Project_Structure](docs_and_results/images/project_structure.png "Project Structure")
 
+# Augmentations
+
+We used the following augmentations for our captcha images:
+
+![Augmentations](docs_and_results/images/augmentations.jpg "Augmentations")
 
 # Contribution guidelines
 
@@ -69,7 +72,7 @@ sbatch captcha.job
 
 # Local Setup
 
-activate the environment, change to desired paramters in configs/configs_common.yaml
+activate the environment, change to desired parameters in configs/configs_common.yaml
 
 ```
 python main.py configs/configs_common.yaml
