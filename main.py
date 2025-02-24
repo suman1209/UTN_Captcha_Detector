@@ -64,7 +64,7 @@ def main2(config_path: str | Path | None = None) -> None:
         config=configs,
         img_transform=get_rectangle_img_transform(configs)
     )
-    
+
     val_dataset = CaptchaDataset(
         configs.val_preprocessed_dir,
         configs.val_labels_dir,
@@ -93,20 +93,25 @@ def main2(config_path: str | Path | None = None) -> None:
     print(f"Test Dataloader has {len(test_loader.dataset)} images")
     assert train_img_count > configs.batch_size, f"Only {train_img_count} train_imgs, {configs.batch_size=}"
     print("### Training Model ###")
-    
+
     if configs.task == 'train':
         map_score = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, 
                             logger=logger, model_name=configs.model_name)
-    
+
     elif configs.task == 'sweep':
         # 1: Define objective/training function
         def objective(config):
             # update the configs files
             configs.batch_size = config.batch_size
             configs.lr = config.lr
+            configs.alpha = config.alpha
+            configs.hard_neg_pos = config.hard_neg_pos
+            configs.flip_prob = config.flip_prob
+            configs.zoom_prob = config.zoom_prob
+            configs.rotation_prob = config.rotation_prob
             configs.log_expt = False
             configs.epochs = 20
-            map_score = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, 
+            map_score = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader,
                             logger=logger, model_name=configs.model_name)
             return map_score
 
@@ -122,6 +127,11 @@ def main2(config_path: str | Path | None = None) -> None:
             "parameters": {
                 "batch_size": {"values": [16, 32, 48, 64]},
                 "lr": {"values": [1e-2, 1e-3, 1e-4]},
+                "alpha": {"values": [0.1, 0.25, 0.5, 0.75, 1.0]},
+                "hard_neg_pos": {"values": [0.5, 1, 2, 3, 4, 5]},
+                "rotation_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
+                "flip_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
+                "zoom_prob":{"values": [0.1, 0.2, 0.3, 0.4, 0.5]}
             },
         }
 
