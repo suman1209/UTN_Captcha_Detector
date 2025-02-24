@@ -31,7 +31,8 @@ def levenshtein(x, y):
 def detect_objects(model, image):
     # Placeholder function to detect objects.
     # returns  a list of (character, bounding_box) tuples.
-
+    device = next(model.parameters()).device  # Get model's device
+    image = image.to(device)
     pred_locs, pred_classes = model(image.unsqueeze(0))  # Forward pass
     # Apply NMS to get final boxes
     return [(char, bbox) for char, bbox in zip(pred_classes, pred_locs)]
