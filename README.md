@@ -73,15 +73,13 @@ checkpoints
 configs  
 datasets  
 docs_and_results  
-notebooks  
+notebooks
 src_code  
-├── data_utils  
-│   ├── __pycache__  
+├── data_utils 
 │   ├── augmentation.py  
 │   ├── dataset_utils.py  
 │   ├── preprocessing.py  
 ├── model_utils  
-│   ├── __pycache__  
 │   ├── backbone.py  
 │   ├── counter.py  
 │   ├── loss.py  
@@ -90,12 +88,9 @@ src_code
 │   ├── train_utils.py  
 │   ├── utils_mnist_ssd.py  
 ├── utils.py  
-task_utils  
-├── __pycache__  
+task_utils 
 │   ├── config_parser.py  
-│   ├── evaluation.py  
-wandb  
-LICENSE  
+│   ├── evaluation.py 
 main.py  
 README.md  
 requirements_conda.yaml  
