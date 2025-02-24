@@ -8,8 +8,6 @@ https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection
 
 https://www.kaggle.com/code/thongnon1996/object-detection-mnist-ssd-pytorch-from-scratch
 
-![Captcha_Image](docs_and_results/images/captcha.png "Captcha_Image")
-
 ![Project_Structure](docs_and_results/images/project_structure.png "Project Structure")
 
 # Augmentations
