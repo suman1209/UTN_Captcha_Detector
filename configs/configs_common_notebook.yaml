@@ -4,6 +4,7 @@ data_configs:
   val_path: "datasets/utn_dataset_curated/part2/val"
   test_path: "datasets/utn_dataset_curated/part2/test"
   preprocessing_related:
+    color: false
     mean: 0.5 # for raw_image normalisation
     std: 0.5 # for raw_image normalisation
     downscale_factor: 4
