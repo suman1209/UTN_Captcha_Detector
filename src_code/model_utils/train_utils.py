@@ -71,7 +71,7 @@ class CaptchaTrainer:
         self.logger = logger
         self.start_epoch = 0  # Default start epoch
         self.checkpoint_path = checkpoint_path
-
+        self.map = None
         # Ensure checkpoint directory exists
         os.makedirs(self.checkpoint_path, exist_ok=True)
 
@@ -176,6 +176,7 @@ class CaptchaTrainer:
         if self.config.debug:
             print(f"{APs = }")
         print(f"{mAP = }")
+        self.map = mAP
         if self.config.log_expt:
             self.logger.log({'mAP': mAP})
         captcha_max_len = 10
@@ -327,6 +328,7 @@ class CaptchaTrainer:
                 scheduler.step()
                 print(f"{scheduler.get_last_lr() = }")
 
+        return self.map
         # Plot the loss curves after training
         # self.plot_loss_curves(ce_losses, loc_losses, ce_pos_losses, ce_neg_losses)
 
@@ -531,4 +533,5 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
         logger.watch(model, loss_fn, log_graph=True, log='all', log_freq=100)
 
     # train
-    trainer.fit()
+    map_score = trainer.fit()
+    return map_score

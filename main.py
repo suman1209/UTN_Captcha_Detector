@@ -79,8 +79,41 @@ def main(config_path: str | Path | None = None) -> None:
     print(f"Test Dataloader has {len(test_loader.dataset)} images")
     assert train_img_count > configs.batch_size, f"Only {train_img_count} train_imgs, {configs.batch_size=}"
     print("### Training Model ###")
-    trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader,
-            logger=logger, model_name=configs.model_name)
+    
+    
+
+    # 1: Define objective/training function
+    def objective(config):
+        # update the configs files
+        configs.batch_size = config.batch_size
+        configs.lr = config.lr
+        configs.debug = False
+        configs.log_expt = False
+        configs.epochs = 20
+        map_score = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, 
+                        logger=logger, model_name=configs.model_name)
+        return map_score
+
+    def main_sweep():
+        wandb.init(project="Captcha-sweep")
+        map_score = objective(wandb.config)
+        wandb.log({"map_score": map_score})
+
+    # 2: Define the search space
+    sweep_configuration = {
+        "method": "random",
+        "metric": {"goal": "maximize", "name": "map_score"},
+        "parameters": {
+            "batch_size": {"values": [16, 32, 48, 64]},
+            "lr": {"values": [1e-2, 1e-3, 1e-4]},
+        },
+    }
+
+    # 3: Start the sweep
+    sweep_id = wandb.sweep(sweep=sweep_configuration, project="Captcha-sweep")
+
+    wandb.agent(sweep_id, function=main_sweep, count=10)
+
     if configs.log_expt:
         # close wandb
         wandb.finish()
