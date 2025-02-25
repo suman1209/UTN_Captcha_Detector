@@ -1,8 +1,110 @@
 # source https://gist.github.com/tuxedocat/fb024dfa36648797084d
-
+import os
 import numpy as np
+import json
 from src_code.model_utils.utils import find_IoU
+import torch
+from tqdm import tqdm
 
+def generate_edit_distance(model, val_loader, configs):
+        """
+        Generates captchas for the test set using the pre-loaded model and saves the results in a JSON file.
+        """
+        edit_distances = []
+        with torch.no_grad():
+            for images, gt_truth, labels_gt in tqdm(val_loader):
+                images = images.to(configs.device)
+                for idx, image in enumerate(images):
+                    # print(image.unsqueeze(0))
+                    loc_preds, cls_preds, _ = model(image.unsqueeze(0))
+                    boxes, labels, scores = model.detect_object(loc_preds, cls_preds, min_score=0.25, max_overlap=0.5,top_k=20)
+                    
+                    list_boxes = boxes[0].tolist()
+                    assert len(list_boxes) == len(labels[0])
+                    for i, label_idx in enumerate(labels[0].tolist()):
+                        list_boxes[i].append(label_idx)
+                    list_boxes = sorted(list_boxes, key=lambda x: x[0])
+                    predicted_captcha = "".join([configs.category_id_labels[i[-1]] for i in list_boxes])
+                    gt_string = "".join([configs.category_id_labels[i] for i in labels_gt[idx].tolist()])
+                    edit_distance = levenshtein(gt_string, predicted_captcha)
+                    edit_distances.append(edit_distance)
+        mean_edit_distance, captcha_count = np.mean(np.array(edit_distances)), len(edit_distances)
+        return mean_edit_distance.item(), captcha_count
+
+
+def test_generate_captchas_submission(model, test_loader, configs, test_path, output_file="test_captchas_submission.json"):
+    """
+    Generates captchas for the test set using the pre-loaded model and saves the results in a JSON file.
+    Image IDs are now taken directly from the filename (without the file extension).
+    """
+    results = []
+
+    # Ensure filenames are sorted numerically
+    filenames = sorted(
+        [f for f in os.listdir(test_path) if os.path.isfile(os.path.join(test_path, f))],
+        key=lambda x: int(os.path.splitext(x)[0])  # Sort based on numeric value
+    )
+
+    with torch.no_grad():
+        for batch_idx, images in tqdm(enumerate(test_loader)):
+            images = images.to(configs.device)
+
+            for idx, image in enumerate(images):
+                # Stop if there are no more filenames left
+                if idx + batch_idx * len(images) >= len(filenames):
+                    print(f"All images processed up to index {idx + batch_idx * len(images)}. Stopping.")
+                    break
+
+                filename = filenames[idx + batch_idx * len(images)]  # Get file based on current index
+                file_number = os.path.splitext(filename)[0]  # Extract number without file extension
+                image_id = file_number  # Use file number as image_id
+
+                # print(f"Processing: {file_number} → Image ID: {image_id}")  # Debugging output
+
+                # Ensure image has correct dimensions
+                if image.dim() == 2:
+                    image = image.unsqueeze(0)  # Convert to (1, H, W)
+                if image.dim() == 3:
+                    image = image.unsqueeze(0)  # Convert to (1, C, H, W)
+
+                # Forward pass through model
+                loc_preds, cls_preds, _ = model(image)
+                boxes, labels, scores = model.detect_object(
+                    loc_preds, cls_preds, min_score=0.15, max_overlap=0.5, top_k=20
+                )
+
+                list_boxes = boxes[0].tolist()
+                
+                if len(list_boxes) == 0:
+                    print(f"⚠ Warning: No predictions for {image_id}, skipping.")
+                    continue  # Skip images with no predictions
+
+                assert len(list_boxes) == len(labels[0])
+
+                # Append label to box data
+                for i, label_idx in enumerate(labels[0].tolist()):
+                    list_boxes[i].append(label_idx)
+
+                # Sort boxes left-to-right
+                list_boxes = sorted(list_boxes, key=lambda x: x[0])
+
+                # Convert labels to string
+                predicted_captcha = "".join([configs.category_id_labels[i[-1]] for i in list_boxes])
+
+                results.append({
+                    "image_id": image_id,  # Now using the file number directly
+                    "captcha_string": predicted_captcha
+                })
+
+    # Debugging output to verify all images are included
+    # print(f"📌 Processed images: {[r['image_id'] for r in results]}")
+    assert len(results) == len(filenames), "⚠ Not all images were processed!"
+
+    # Save results to JSON
+    with open(output_file, "w") as f:
+        json.dump(results, f, indent=4)
+
+    print(f"Predictions saved to {output_file}")
 
 def levenshtein(x, y):
 

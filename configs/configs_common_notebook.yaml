@@ -31,7 +31,7 @@ model_configs:
   # checkpoint: "checkpoints/model_checkpoint.pth"  # Resume training from last saved epoch
   print_freq: 500
   epochs: 10
-  batch_size: 2
+  batch_size: 100
   device: "cuda" # either "cpu" or "cuda"
   backbone:
     name: VGG16
