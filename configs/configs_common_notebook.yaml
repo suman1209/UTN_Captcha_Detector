@@ -25,7 +25,7 @@ data_configs:
 
 model_configs:
   name: "ssd_mnist" # "ssd_mnist" or "ssd_captcha"
-  save_checkpoint: True
+  resume_from_checkpoint_path: null
   log_gradients: False
   checkpoint: null # Training from Scratch
   # checkpoint: "checkpoints/model_checkpoint.pth"  # Resume training from last saved epoch

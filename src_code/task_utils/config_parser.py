@@ -41,6 +41,7 @@ class ConfigParser:
         model_configs = self.config_dict.get("model_configs")
         self.model_name = model_configs.get("name")
         self.log_gradients = model_configs.get("log_gradients")
+        self.resume_from_checkpoint_path = model_configs.get("resume_from_checkpoint_path")
         if model_configs is None:
             raise KeyError("model_configs is missing from the config file!")
         self.model_configs = model_configs  

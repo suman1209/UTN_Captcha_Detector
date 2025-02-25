@@ -8,6 +8,44 @@ from src_code.data_utils.preprocessing import get_rectangle_img_transform, prepr
 import yaml
 import sys
 
+def get_train_val_test_loaders(configs, img_transform):
+    # Create datasets
+    train_dataset = CaptchaDataset(
+        configs.train_preprocessed_dir,
+        configs.train_labels_dir,
+        augment=True,
+        config=configs,
+        img_transform=img_transform
+    )
+
+    val_dataset = CaptchaDataset(
+        configs.val_preprocessed_dir,
+        configs.val_labels_dir,
+        augment=False,
+        config=configs,
+        img_transform=img_transform
+    )
+
+    test_dataset = CaptchaDataset(
+        configs.test_preprocessed_dir,
+        labels_dir=None,
+        augment=False,
+        config=configs,
+        img_transform=img_transform
+    )
+
+    # Create data loaders
+    train_loader = get_dataloader(train_dataset, configs)
+    val_loader = get_dataloader(val_dataset, configs)
+    test_loader = get_dataloader(test_dataset, configs)
+    img, bboxes, labels = next(iter(train_loader))
+    # Print batch info
+    train_img_count = len(train_loader.dataset)
+    print(f"Train Dataloader has {train_img_count} images")
+    print(f"Validation Dataloader has {len(val_loader.dataset)} images")
+    print(f"Test Dataloader has {len(test_loader.dataset)} images")
+    assert train_img_count > configs.batch_size, f"Only {train_img_count} train_imgs, {configs.batch_size=}"
+    return train_loader, val_loader, test_loader
 
 def main2(config_path: str | Path | None = None) -> None:
     # all the parameters can be obtained from this configs object
@@ -47,46 +85,13 @@ def main2(config_path: str | Path | None = None) -> None:
     preprocess_all(config_path)
 
     print("### Creating Dataloaders ###")
+    
 
-    # Create datasets
-    train_dataset = CaptchaDataset(
-        configs.train_preprocessed_dir,
-        configs.train_labels_dir,
-        augment=True,
-        config=configs,
-        img_transform=get_rectangle_img_transform(configs)
-    )
-
-    val_dataset = CaptchaDataset(
-        configs.val_preprocessed_dir,
-        configs.val_labels_dir,
-        augment=False,
-        config=configs,
-        img_transform=get_rectangle_img_transform(configs)
-    )
-
-    test_dataset = CaptchaDataset(
-        configs.test_preprocessed_dir,
-        labels_dir=None,
-        augment=False,
-        config=configs,
-        img_transform=get_rectangle_img_transform(configs)
-    )
-
-    # Create data loaders
-    train_loader = get_dataloader(train_dataset, configs)
-    val_loader = get_dataloader(val_dataset, configs)
-    test_loader = get_dataloader(test_dataset, configs)
-    img, bboxes, labels = next(iter(train_loader))
-    # Print batch info
-    train_img_count = len(train_loader.dataset)
-    print(f"Train Dataloader has {train_img_count} images")
-    print(f"Validation Dataloader has {len(val_loader.dataset)} images")
-    print(f"Test Dataloader has {len(test_loader.dataset)} images")
-    assert train_img_count > configs.batch_size, f"Only {train_img_count} train_imgs, {configs.batch_size=}"
+    
     print("### Training Model ###")
 
     if configs.task == 'train':
+        train_loader, val_loader, test_loader = get_train_val_test_loaders(configs, get_rectangle_img_transform(configs))
         map_score = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, 
                             logger=logger, model_name=configs.model_name)
 
@@ -105,6 +110,7 @@ def main2(config_path: str | Path | None = None) -> None:
             configs.salt_pepper_prob = config.salt_pepper_prob
             configs.log_expt = False
             configs.epochs = 5
+            train_loader, val_loader, test_loader = get_train_val_test_loaders(configs, get_rectangle_img_transform(configs))
             map_score, edit_dist = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader,
                             logger=logger, model_name=configs.model_name)
             return edit_dist
@@ -121,7 +127,7 @@ def main2(config_path: str | Path | None = None) -> None:
             "parameters": {
                 "batch_size": {"values": [16, 32, 48, 64]},
                 "lr": {"values": [1e-2, 1e-3, 1e-4]},
-                "alpha": {"values": [0.1, 0.25, 0.5, 0.75]},
+                "alpha": {"values": [0.25, 0.5, 0.75]},
                 "hard_neg_pos": {"values": [0.5, 1, 2, 3, 4, 5]},
                 "rotation_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
                 "flip_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},

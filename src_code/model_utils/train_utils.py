@@ -22,6 +22,7 @@ from tqdm import tqdm
 from pathlib import Path as p
 from datetime import datetime
 from src_code.task_utils.evaluation import levenshtein
+from src_code.task_utils.evaluation import generate_edit_distance
 os.environ['WANDB_CACHE_DIR'] = "./"
 os.environ['WANDB_DATA_DIR'] = "./"
 
@@ -65,14 +66,21 @@ class CaptchaTrainer:
         self.logger = logger
         self.start_epoch = 0  # Default start epoch
         self.checkpoint_path = checkpoint_path
-        self.map = None
-        self.edit_distance = None
+        self.prev_map = -1
+        self.prev_edit_distance = -1
+        self.map = -2
+        self.edit_distance = -2
         # Ensure checkpoint directory exists
         os.makedirs(self.checkpoint_path, exist_ok=True)
-
-        # Load checkpoint if available
-        if hasattr(config, "checkpoint") and config.checkpoint is not None:
-            self.load_checkpoint(config.checkpoint)
+    def save_chpt_condition(self):
+        # save every 10% progress
+        # percent = 10
+        # save_range = range(0, self.config.epochs, math.ceil(self.config.epochs/percent))
+        # save_epoch_list = list(save_range)
+        # epoch in save_epoch_list and self.save_checkpoint
+        if self.edit_dist > self.prev_edit_distance:
+            return True
+        return False
 
     def train_step(self, epoch):
         self.model.to(self.config.device)
@@ -156,7 +164,7 @@ class CaptchaTrainer:
                 all_labels_gt.extend(labels)
                 all_difficulties_gt = [torch.zeros_like(i, dtype=torch.bool) for i in all_labels_gt]
         APs, mAP = utils_mnist_ssd.calculate_mAP(all_boxes_output, all_labels_output, all_scores_output, all_boxes_gt, all_labels_gt, all_difficulties_gt)
-        edit_distance, count = self.generate_edit_distance(self.model, self.val_loader, self.config)
+        edit_distance, count = generate_edit_distance(self.model, self.val_loader, self.config)
         if self.config.debug:
             print(f"{APs = }")
         print(f"{mAP = }")
@@ -257,50 +265,6 @@ class CaptchaTrainer:
         time.sleep(3)
         print(f"Checkpoint saved at {save_path}")
 
-    def load_checkpoint(self, filename="model_checkpoint.pth"):
-        """Loads model checkpoint if available."""
-        # Ensure the filename is a correct absolute path
-        assert self.config.checkpoint is not None, "Please specify the checkpoint in the configs!"
-        if not os.path.isabs(filename):
-            load_path = filename
-        else:
-            load_path = os.path.join(self.config.checkpoint, filename)
-
-        if os.path.exists(load_path):
-            checkpoint = torch.load(load_path, map_location=self.config.device)
-            self.model.load_state_dict(checkpoint["model_state"])
-            self.optim.load_state_dict(checkpoint["optimizer_state"])
-            self.start_epoch = checkpoint["epoch"] + 1
-            print(f"Checkpoint loaded from {load_path} (starting from epoch {self.start_epoch})")
-        else:
-            print(f"No checkpoint found at {load_path}. Training from scratch.")
-            
-    def generate_edit_distance(self, model, val_loader, configs):
-        """
-        Generates captchas for the test set using the pre-loaded model and saves the results in a JSON file.
-        """
-        edit_distances = []
-        with torch.no_grad():
-            for images, gt_truth, labels_gt in val_loader:
-                images = images.to(configs.device)
-                for idx, image in enumerate(images):
-                    # print(image.unsqueeze(0))
-                    loc_preds, cls_preds, _ = model(image.unsqueeze(0))
-                    boxes, labels, scores = model.detect_object(loc_preds, cls_preds, min_score=0.25, max_overlap=0.5,top_k=20)
-                    
-                    list_boxes = boxes[0].tolist()
-                    assert len(list_boxes) == len(labels[0])
-                    for i, label_idx in enumerate(labels[0].tolist()):
-                        list_boxes[i].append(label_idx)
-                    list_boxes = sorted(list_boxes, key=lambda x: x[0])
-                    predicted_captcha = "".join([configs.category_id_labels[i[-1]] for i in list_boxes])
-                    gt_string = "".join([configs.category_id_labels[i] for i in labels_gt[idx].tolist()])
-                    edit_distance = levenshtein(gt_string, predicted_captcha)
-                    edit_distances.append(edit_distance)
-        mean_edit_distance, captcha_count = np.mean(np.array(edit_distances)), len(edit_distances)
-        return mean_edit_distance.item(), captcha_count
-
-
 
     def fit(self):
         scheduler = self.get_scheduler()
@@ -311,10 +275,7 @@ class CaptchaTrainer:
         loc_losses = []
         ce_pos_losses = []
         ce_neg_losses = []
-        # save every 10% progress
-        percent = 10
-        save_range = range(0, self.config.epochs, math.ceil(self.config.epochs/percent))
-        save_epoch_list = list(save_range)
+
         for epoch in tqdm(range(self.start_epoch, self.config.epochs), desc=f"Training {self.config.model_name}", unit="iteration"):
             loss, ce_loss, loc_loss, ce_pos_loss, ce_neg_loss = self.train_step(epoch)
 
@@ -325,12 +286,14 @@ class CaptchaTrainer:
             ce_pos_losses.append(ce_pos_loss.avg)
             ce_neg_losses.append(ce_neg_loss.avg)
 
-            # Save checkpoint
-            if epoch in save_epoch_list and self.save_checkpoint:
-                self.save_checkpoint(epoch)
-
             # Run validation (if applicable)
             self.validation_step(epoch)
+            # Save checkpoint
+            if self.save_chpt_condition:
+                self.save_checkpoint(epoch)
+            # update previous performance
+            self.prev_map = self.map
+            self.prev_edit_distance = self.edit_distance
 
             if scheduler is not None:
                 scheduler.step()
@@ -477,6 +440,8 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
         assert utils_mnist_ssd.img_size == [new_h, new_w], "mismatch!"
 
         model = SSD(configs, base_conv, aux_conv).to(configs.device)
+        if configs.resume_from_checkpoint_path is not None:
+            model.load_from_checkpoint()
         # a dummy forward pass to assert correctness
         locs, cls_, fms = model(img.to(configs.device))
         assert locs.shape[1] == cls_.shape[1], "mismatch!"

@@ -6,6 +6,7 @@ import numpy as np
 from .utils_mnist_ssd import cxcy_to_gcxgcy,  gcxgcy_to_cxcy, class_label
 from .utils import cxcy_to_xy, find_IoU, xy_to_cxcy
 import torch.nn.functional as F
+import os
 basic_conv = nn.Conv2d  # change this to 3d if needed
 
 
@@ -310,7 +311,20 @@ class SSD(nn.Module):
             all_images_labels.append(image_labels)
             all_images_scores.append(image_scores)
         return all_images_boxes, all_images_labels, all_images_scores
-
+    
+    def load_from_checkpoint(self):
+        """ Loads model checkpoint if available."""
+        # Ensure the filename is a correct absolute path
+        chpt_path = self.configs.resume_from_checkpoint_path
+        assert chpt_path is not None, "Please specify the checkpoint in the configs!"
+        assert os.path.exists(chpt_path), f"{chpt_path} doesn't exist!"
+        checkpoint = torch.load(chpt_path, weights_only=False, map_location=self.configs.device)
+        
+        self.load_state_dict(checkpoint["model_state"])
+        # @todo, think about how we do the optimizer run 
+        # self.optim.load_state_dict(checkpoint["optimizer_state"])
+        start_epoch = checkpoint["epoch"] + 1
+        print(f"Checkpoint loaded from {chpt_path} (starting from epoch {start_epoch})")
 
 class MultiBoxLossSSD(nn.Module):
     def __init__(self, priors_cxcy, configs):
