@@ -44,6 +44,16 @@ requirements_conda.yaml
 requirements.txt
 
 ```
+# Evaluation
+In the repo, there is a curated_version of the exact final dataset,
+this helps with quick testing and verification, for a full run the full dataset 
+must be placed inside [datasets](./datasets) and path adjusted in the respective [configs](./configs/configs_common_full.yaml)
+file.
+
+In order to facilitate evaluation of our model, we include our best checkpoint and 
+a [demo.ipynb](./notebooks/demo.ipynb) along with its config file [notebook_config](configs/configs_common_notebook.yaml)
+for replicating the final json predictions and checking the final edit distance.
+
 
 # Augmentations
 
