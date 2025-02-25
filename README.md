@@ -117,6 +117,10 @@ sbatch captcha.job
 
 activate the environment, change to desired parameters in configs/configs_common_simple.yaml
 Optionally, log_expt can be set to True to view the training status in realtime in [wandb](https://wandb.ai/site).
+
+Note that running [main.py](./main.py) for the first time is going to create a preprocessed dataset, which will enable faster training
+but currently preprocessing happens on the fly during training just to facilitate experimentation.
+
 ```
 python main.py configs/configs_common.yaml
 ```
