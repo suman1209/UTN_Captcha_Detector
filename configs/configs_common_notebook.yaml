@@ -61,5 +61,6 @@ task_configs:
   debug: True # if True will display a lot of intermediate information for debugging purposes
   log_expt: False # whether to log the experiment online or not
   num_classes: 37 # A-Z(26), 0-9(10), background(1)
-  min_cls_score: 0.01 # if the cls score for a bounding box is less than this, it is considered as background
+  nms_min_cls_score: 0.01 # if the cls score for a bounding box is less than this, it is considered as background
   nms_iou_score: 0.1 # if the iou between two bounding boxes is less than this, it is suppressed
+  nms_topk: 20

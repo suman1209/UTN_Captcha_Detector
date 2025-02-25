@@ -92,7 +92,7 @@ def main2(config_path: str | Path | None = None) -> None:
     
     if configs.task == 'train':
         train_loader, val_loader, test_loader = get_train_val_test_loaders(configs, get_rectangle_img_transform(configs))
-        map_score = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, 
+        map_score, edit_dist = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, 
                             logger=logger, model_name=configs.model_name)
 
     elif configs.task == 'sweep':
@@ -108,7 +108,12 @@ def main2(config_path: str | Path | None = None) -> None:
             configs.rotation_prob = config.rotation_prob
             configs.line_prob = config.line_prob
             configs.salt_pepper_prob = config.salt_pepper_prob
+            # NMS parameters
+            configs.nms_min_cls_score = config.nms_min_cls_score
+            configs.nms_iou_score = config.nms_iou_score
+            configs.nms_topk = config.nms_topk
             configs.epochs = 5
+            logger = wandb
             train_loader, val_loader, test_loader = get_train_val_test_loaders(configs, get_rectangle_img_transform(configs))
             map_score, edit_dist = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader,
                             logger=logger, model_name=configs.model_name)
@@ -132,10 +137,19 @@ def main2(config_path: str | Path | None = None) -> None:
                 "flip_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
                 "zoom_prob": {"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
                 "line_prob":{"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
-                "salt_pepper_prob":{"values": [0.1, 0.2, 0.3, 0.4, 0.5]}
-            },
+                "salt_pepper_prob":{"values": [0.1, 0.2, 0.3, 0.4, 0.5]},
+                # New parameters for NMS tuning
+                "nms_min_cls_score": {
+                    "values": [0.1, 0.2, 0.3, 0.4, 0.5]  # Minimum class confidence to retain a detection
+                },
+                "nms_iou_score": {
+                    "values": [0.15, 0.3, 0.4, 0.5]  # IoU threshold for suppressing overlapping boxes
+                },
+                "nms_topk": {
+                    "values": [5, 7, 8, 10, 12, 15, 18]  # Maximum detections to keep per image (adjust for captcha length)
+                    },
+                }
         }
-
         # 3: Start the sweep
         sweep_id = wandb.sweep(sweep=sweep_configuration, project="Captcha-sweep")
 

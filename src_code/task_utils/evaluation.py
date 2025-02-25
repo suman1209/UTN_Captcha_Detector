@@ -17,7 +17,8 @@ def generate_edit_distance(model, val_loader, configs):
                 for idx, image in enumerate(images):
                     # print(image.unsqueeze(0))
                     loc_preds, cls_preds, _ = model(image.unsqueeze(0))
-                    boxes, labels, scores = model.detect_object(loc_preds, cls_preds, min_score=0.25, max_overlap=0.5,top_k=20)
+                    boxes, labels, scores = model.detect_object(loc_preds, cls_preds, min_score=configs.nms_min_cls_score,
+                     max_overlap=configs.nms_iou_score, top_k=configs.nms_topk)
                     
                     list_boxes = boxes[0].tolist()
                     assert len(list_boxes) == len(labels[0])

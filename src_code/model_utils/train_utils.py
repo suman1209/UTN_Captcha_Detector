@@ -152,7 +152,10 @@ class CaptchaTrainer:
             for images, boxes, labels in tqdm(self.val_loader):  # labels: list[n] of tensors[n_object]
 
                 loc_output, cla_output, _ = self.model(images.to(self.config.device))  # loc_output: tensor[n,n_p,4], cla_output: tensor[n, n_p, n_classes]
-                boxes_output, labels_output, scores_output = self.model.detect_object(loc_output, cla_output, min_score=0.2, max_overlap=0.45, top_k=32)
+                boxes_output, labels_output, scores_output = self.model.detect_object(loc_output, cla_output,
+                 min_score=self.config.nms_min_cls_score,
+                 max_overlap=self.config.nms_iou_score,
+                 top_k=self.config.nms_topk)
 
                 all_boxes_output.extend(boxes_output)
                 all_labels_output.extend(labels_output)
@@ -178,15 +181,25 @@ class CaptchaTrainer:
         matched_boxes = None
         if self.config.log_expt:
             with torch.no_grad():
-                for i, (images, boxes, labels) in enumerate(self.val_loader):
+                for i, (images, boxes, labels_gt) in enumerate(self.val_loader):
                     images = images.to(self.config.device)
                     loc_pred, cls_pred, fm_info = self.model(images)
-                    loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels)
+                    loss, debug_info = self.loss_fn(loc_pred, cls_pred, boxes, labels_gt)
                     predicted_boxes, labels, scores = self.model.detect_object(loc_pred, cls_pred, min_score=0.25, max_overlap=0.5, top_k=20)
-                    predicted_boxes = predicted_boxes[random_image].tolist()
+                    
+                    list_boxes = predicted_boxes[random_image].tolist()
+                    assert len(list_boxes) == len(labels[random_image])
+                    for i, label_idx in enumerate(labels[random_image]):
+                        list_boxes[i].append(label_idx.item())
+                    list_boxes = sorted(list_boxes, key=lambda x: x[0])
+                    
+                    predicted_captcha = "".join([self.config.category_id_labels[i[-1]] for i in list_boxes])
+                    str_labels = ["".join([category_id_labels[i.item()] for i in label]) for label in labels_gt]
+                    edit_distance = levenshtein(str_labels[random_image], predicted_captcha)
+                    predicted_boxes = list_boxes
                     if debug_info == {}:
                         break
-                    str_labels = ["".join([category_id_labels[i.item()] for i in label]) for label in labels]
+                    
                     if not only_once:
 
                         img_np = images[random_image].cpu().detach().numpy().transpose(1, 2, 0)
@@ -403,8 +416,8 @@ class CaptchaTrainer:
         if predicted_boxes is not None:
             # Plot neg boxes
             for box in predicted_boxes:
-                x_min, y_min, x_max, y_max = box
-                rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='red', facecolor='none')
+                x_min, y_min, x_max, y_max, lb = box
+                rect = patches.Rectangle((x_min, y_min), x_max - x_min, y_max - y_min, linewidth=1, edgecolor='blue', facecolor='none')
                 ax.add_patch(rect)
         ax.legend()
         ax.set_title(f"Image in epoch: {epoch}, step {i}")

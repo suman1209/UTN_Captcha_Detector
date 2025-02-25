@@ -74,6 +74,10 @@ class ConfigParser:
         self.num_classes = task_configs.get("num_classes")
         self.img_height = task_configs.get("img_height")
         self.img_width = task_configs.get("img_width")
+        self.nms_min_cls_score = task_configs.get("nms_min_cls_score")
+        self.nms_iou_score = task_configs.get("nms_iou_score")
+        self.nms_topk = task_configs.get("nms_topk")
+        self.img_width = task_configs.get("img_width")
         return self
 
     def update(self, additional_config: dict):
