@@ -103,14 +103,12 @@ class CaptchaTrainer:
             loss.backward()
 
             self.optim.step()
-
             # Extract and detach loss components
             ce_loss = debug_info.get('ce_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
             loc_loss = debug_info.get('loc_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
             ce_pos_loss = debug_info.get('ce_pos_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
             ce_neg_loss = debug_info.get('ce_hard_neg_loss', torch.tensor(0.0, device=self.config.device)).detach().cpu().item()
             loss_value = loss.detach().cpu().item()
-
             # Update metrics
             losses.update(loss_value, images.size(0))
             ce_losses.update(ce_loss, images.size(0))
@@ -173,6 +171,7 @@ class CaptchaTrainer:
         self.edit_distance = edit_distance
         if self.config.log_expt:
             self.logger.log({'mAP': mAP})
+            self.logger.log({'edit_distance': edit_distance})
         captcha_max_len = 10
         predicted_captcha = "".join([category_id_labels[i.item()] for i in all_labels_output[random_image]][:captcha_max_len])
         predicted_boxes = None
@@ -414,6 +413,7 @@ class CaptchaTrainer:
 
 
 def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger, model_name):
+    
     if model_name == "ssd_mnist":
         base_conv = BaseConv(configs.base_conv_conv_layers,
                     configs.base_conv_input_size, chosen_fm=[-2, -1],
@@ -458,6 +458,7 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
                                     {'params': not_bias}],
                                     lr=configs.lr, weight_decay=configs.weight_decay)
         # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, configs.multistep_milestones, gamma=configs.multistep_gamma, verbose=False)
+        
         loss_fn = MultiBoxLossSSD(priors_cxcy=model.priors_cxcy, configs=configs)
 
     elif model_name == "ssd_captcha":

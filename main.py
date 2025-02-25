@@ -60,7 +60,7 @@ def main2(config_path: str | Path | None = None) -> None:
     setattr(configs, "base_conv_input_size", [new_h, new_w])
     logger = None
 
-    if configs.log_expt:
+    if configs.log_expt and configs.task=="train":
         # wandb initialisation
         wandb.init(
         # set the wandb project where this run will be logged
@@ -89,7 +89,7 @@ def main2(config_path: str | Path | None = None) -> None:
 
     
     print("### Training Model ###")
-
+    
     if configs.task == 'train':
         train_loader, val_loader, test_loader = get_train_val_test_loaders(configs, get_rectangle_img_transform(configs))
         map_score = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader, 
@@ -108,7 +108,6 @@ def main2(config_path: str | Path | None = None) -> None:
             configs.rotation_prob = config.rotation_prob
             configs.line_prob = config.line_prob
             configs.salt_pepper_prob = config.salt_pepper_prob
-            configs.log_expt = False
             configs.epochs = 5
             train_loader, val_loader, test_loader = get_train_val_test_loaders(configs, get_rectangle_img_transform(configs))
             map_score, edit_dist = trainer(configs,  train_loader, val_loader=val_loader, test_loader=test_loader,

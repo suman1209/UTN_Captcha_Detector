@@ -335,7 +335,7 @@ class MultiBoxLossSSD(nn.Module):
         self.priors_xy = cxcy_to_xy(priors_cxcy)
         self.loc_criterion = nn.L1Loss()
         self.cla_criterion = nn.CrossEntropyLoss(reduction='none')
-        self.debug = configs.debug
+        self.debug = configs.debug or configs.log_expt
 
     def initialise_debug_info(self):
         debug_info = {}
@@ -415,6 +415,7 @@ class MultiBoxLossSSD(nn.Module):
             ce_pos_loss = self.configs.alpha * (cla_loss_pos.sum()) / n_pos
             debug_info["ce_pos_loss"] = ce_pos_loss
             debug_info["loss"] = self.loc_loss + self.cla_loss
+        
         if not self.debug:
             debug_info = {}
         return self.configs.alpha * self.loc_loss + self.cla_loss, debug_info
