@@ -9,11 +9,11 @@ data_configs:
     std: 0.5 # for raw_image normalisation
     downscale_factor: 4
   dataset_related:
-    train_preprocessed_dir: "../datasets/utn_dataset_curated/part2/train/images"
-    val_preprocessed_dir: "../datasets/utn_dataset_curated/part2/val/images"
-    test_preprocessed_dir: "../datasets/utn_dataset_curated/part2/test/images"
-    train_labels_dir: "../datasets/utn_dataset_curated/part2/train/labels"
-    val_labels_dir: "../datasets/utn_dataset_curated/part2/val/labels"
+    train_preprocessed_dir: "../datasets/utn_dataset/part2/train/images"
+    val_preprocessed_dir: "../datasets/utn_dataset/part2/val/images"
+    test_preprocessed_dir: "../datasets/utn_dataset/part2/test/images"
+    train_labels_dir: "../datasets/utn_dataset/part2/train/labels"
+    val_labels_dir: "../datasets/utn_dataset/part2/val/labels"
     augment: True
     shuffle: False
   augmentation_related:
