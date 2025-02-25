@@ -1,4 +1,4 @@
-task: "sweep" # 'train', 'evaluate' or 'sweep'
+task: "train" # 'train', 'evaluate' or 'sweep'
 data_configs:
   train_path: "datasets/utn_dataset/part2/train"
   val_path: "datasets/utn_dataset/part2/val"
