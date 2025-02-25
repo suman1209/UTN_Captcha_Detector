@@ -1,14 +1,49 @@
 # UTN_Captcha_Detector
 
-This is a project to detect CAPTCHA using a single-shot multi-box detector.
+This is a project to detect CAPTCHA using [Single Shot Multibox Detector (SSD)](https://arxiv.org/abs/1512.02325).
 
-Main Resource for the loss function used:
+The following repos were referred for the pytorch implementation of SSD. However most implementations are done
+for square (300x300) images, in this project we adapt the models for rectangular smaller images.
+Multiple utility functions are also directly adapted.
 
 https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection
 
 https://www.kaggle.com/code/thongnon1996/object-detection-mnist-ssd-pytorch-from-scratch
 
+# Project Structure
+
+The project architecture is shown below, the full hyperparameters space is listed in [config files](./configs/configs_common_full.yaml)
+and used for training, evaluating and hyperparamer tuning.
+
 ![Project_Structure](docs_and_results/images/project_structure.png "Project Structure")
+```
+configs  
+datasets  
+docs_and_results  
+notebooks
+src_code  
+├── data_utils 
+│   ├── augmentation.py  
+│   ├── dataset_utils.py  
+│   ├── preprocessing.py  
+├── model_utils  
+│   ├── backbone.py  
+│   ├── counter.py  
+│   ├── loss.py  
+│   ├── mnist_ssd.py  
+│   ├── ssd.py  
+│   ├── train_utils.py  
+│   ├── utils_mnist_ssd.py  
+│   ├── utils.py  
+task_utils 
+│   ├── config_parser.py  
+│   ├── evaluation.py 
+main.py  
+README.md  
+requirements_conda.yaml  
+requirements.txt
+
+```
 
 # Augmentations
 
@@ -68,41 +103,11 @@ Submit the job
 sbatch captcha.job
 ```
 
-# Local Setup
+# Run the main file
 
-activate the environment, change to desired parameters in configs/configs_common.yaml
-
+activate the environment, change to desired parameters in configs/configs_common_simple.yaml
+Optionally, log_expt can be set to True to view the training status in realtime in [wandb](https://wandb.ai/site).
 ```
 python main.py configs/configs_common.yaml
 ```
 
-# Project Structure
-
-```
-configs  
-datasets  
-docs_and_results  
-notebooks
-src_code  
-├── data_utils 
-│   ├── augmentation.py  
-│   ├── dataset_utils.py  
-│   ├── preprocessing.py  
-├── model_utils  
-│   ├── backbone.py  
-│   ├── counter.py  
-│   ├── loss.py  
-│   ├── mnist_ssd.py  
-│   ├── ssd.py  
-│   ├── train_utils.py  
-│   ├── utils_mnist_ssd.py  
-│   ├── utils.py  
-task_utils 
-│   ├── config_parser.py  
-│   ├── evaluation.py 
-main.py  
-README.md  
-requirements_conda.yaml  
-requirements.txt
-
-```

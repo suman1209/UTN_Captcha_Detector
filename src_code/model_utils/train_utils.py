@@ -200,12 +200,6 @@ class CaptchaTrainer:
                     break
 
     def log_logits(self, my_table, epoch):
-        """this code was generated using deepseek with the following prompt: 
-
-        my_table = wandb.Table(columns=["GT"] + list(category_id_labels.values()) + ["bg"], data=[[f"{GT_str[i]}-{GT_int[i]}"] + logit.tolist() for i, logit in enumerate(logits)])
-        i want a bar plot for each row, and all the bar plots in a single image divided by grids
-
-        """
         columns = my_table.columns
         data = my_table.data
 
