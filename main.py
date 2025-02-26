@@ -153,7 +153,7 @@ def main2(config_path: str | Path | None = None) -> None:
         # 3: Start the sweep
         sweep_id = wandb.sweep(sweep=sweep_configuration, project="Captcha-sweep")
 
-        wandb.agent(sweep_id, function=main, count=20)
+        wandb.agent(sweep_id, function=main, count=40)
 
         if configs.log_expt:
             # close wandb

@@ -210,7 +210,7 @@ class CaptchaTrainer:
                         #     pb = -1
                         # else:
                         #     pb = len(matched_boxes)
-                        self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, predicted_boxes, f"epoch={epoch} label = {label} {predicted_captcha = }", i)
+                        self.plot_bb(img_np, gt_boxes, matched_boxes, neg_boxes, predicted_boxes, f"epoch={epoch} label = {label} {predicted_captcha = } {edit_distance = }", i)
                         # logits = debug_info["soft_maxed_pred"][random_image]
                         # GT_int = labels[random_image].tolist()
                         # GT_str = str_labels[random_image]
@@ -423,6 +423,7 @@ class CaptchaTrainer:
         ax.set_title(f"Image in epoch: {epoch}, step {i}")
         wandb.log({f"bbox_visual-{epoch =}": wandb.Image(fig)})
         plt.close(fig)
+        del ax
 
 
 def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger, model_name):
