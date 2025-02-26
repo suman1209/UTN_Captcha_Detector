@@ -5,6 +5,39 @@ import json
 from src_code.model_utils.utils import find_IoU
 import torch
 from tqdm import tqdm
+import torchvision
+from torchvision.utils import draw_bounding_boxes
+import matplotlib.pyplot as plt
+
+def plot_image_with_bboxes(configs, image, bboxes, labels, title="Image with Bounding Boxes"):
+    # img_height, img_width = image.shape[1], image.shape[2] 
+    
+    # Scale normalized bboxes to absolute pixel values for visualization
+    bboxes[:, [0, 2]] *= 640
+    bboxes[:, [1, 3]] *= 160
+
+    # Convert to integer values for plotting
+    bboxes_abs = bboxes.to(torch.int)
+    # Ensure labels are strings
+    if isinstance(labels, torch.Tensor):
+        labels = labels.tolist()
+    labels_str = [str(l) for l in labels]
+    image_torch = torchvision.transforms.functional.pil_to_tensor(image)
+    # Draw bounding boxes
+    image_with_boxes = draw_bounding_boxes(image_torch, bboxes_abs, labels=labels_str, colors="red", width=1)
+    
+    # Image tensor to NumPy for visualization
+    img = image_with_boxes.permute(1, 2, 0).numpy()
+    list_boxes = bboxes.tolist()
+    assert len(list_boxes) == len(labels), f"{list_boxes = }, {labels =}"
+    for i, label_idx in enumerate(labels):
+        list_boxes[i].append(label_idx)
+    list_boxes = sorted(list_boxes, key=lambda x: x[0])
+    pred_captcha = "".join([configs.category_id_labels[i[-1]] for i in list_boxes])
+    plt.imshow(img)
+    plt.axis("off")
+    plt.title(f'{pred_captcha =}')
+    plt.show()
 
 def generate_edit_distance(model, val_loader, configs):
         """

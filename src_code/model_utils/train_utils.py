@@ -456,6 +456,24 @@ def trainer(configs: ConfigParser, train_loader, val_loader, test_loader, logger
         model = SSD(configs, base_conv, aux_conv).to(configs.device)
         if configs.resume_from_checkpoint_path is not None:
             model.load_from_checkpoint()
+        total_params = 0
+        base_params = 0
+        aux_params = 0
+        pred_head_params = 0
+        for param_name, param in model.named_parameters():
+                if param.requires_grad:
+                    print(f"{param_name}, {param.shape}")
+                    if 'base_conv' in param_name:
+                        base_params += param.numel()
+                    elif 'aux_conv' in param_name:
+                        aux_params += param.numel()
+                    elif 'pred_conv' in param_name:
+                        pred_head_params += param.numel()
+                    
+                    total_params += param.numel()
+        print(f"{base_params = }, {aux_params = }, {pred_head_params = }")
+        print(f"{(base_params + aux_params + pred_head_params) = }")
+        print(f'{total_params = }')
         # a dummy forward pass to assert correctness
         locs, cls_, fms = model(img.to(configs.device))
         assert locs.shape[1] == cls_.shape[1], "mismatch!"
