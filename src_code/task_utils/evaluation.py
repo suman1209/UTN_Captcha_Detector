@@ -9,7 +9,7 @@ import torchvision
 from torchvision.utils import draw_bounding_boxes
 import matplotlib.pyplot as plt
 
-def plot_image_with_bboxes(configs, image, bboxes, labels, title="Image with Bounding Boxes"):
+def plot_image_with_bboxes(img_id, configs, image, bboxes, labels, title="Image with Bounding Boxes"):
     # img_height, img_width = image.shape[1], image.shape[2] 
     
     # Scale normalized bboxes to absolute pixel values for visualization
@@ -37,8 +37,9 @@ def plot_image_with_bboxes(configs, image, bboxes, labels, title="Image with Bou
     plt.imshow(img)
     plt.axis("off")
     plt.title(f'{pred_captcha =}')
+    
+    plt.savefig(f"../docs_and_results/test_set_results/{img_id}")
     plt.show()
-
 def generate_edit_distance(model, val_loader, configs):
         """
         Generates captchas for the test set using the pre-loaded model and saves the results in a JSON file.
